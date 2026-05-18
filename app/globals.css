@@ -1,26 +1,320 @@
+/* app/globals.css */
 @import "tailwindcss";
 
+/* ─── Design tokens ───────────────────────────────────────────────────────── */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background:  10 10 12;
+  --foreground:  240 240 245;
+  --accent:      34 211 238;   /* cyan-400 */
+  --accent-2:    74 222 128;   /* emerald-400 */
+  --panel-bg:    15 23 42;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* ─── Base ────────────────────────────────────────────────────────────────── */
+
+body {
+  background-color: rgb(var(--background));
+  color: rgb(var(--foreground));
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* ─── Scrollbars ──────────────────────────────────────────────────────────── */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #334155 transparent;
+}
+::-webkit-scrollbar        { width: 5px; height: 5px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: #334155; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+/* ─── Focus rings ─────────────────────────────────────────────────────────── */
+
+*:focus-visible {
+  outline: 2px solid rgba(34, 211, 238, 0.6);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* ─── Glass surfaces ──────────────────────────────────────────────────────── */
+
+.glass {
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+/* Surface — slightly lighter than glass, for nested panels */
+.surface {
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.09);
+}
+
+/* Hoverable glass card */
+.glass-card {
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.glass-card:hover {
+  border-color: rgba(34, 211, 238, 0.25);
+  box-shadow:
+    0 0 0 1px rgba(34, 211, 238, 0.08),
+    0 0 24px rgba(34, 211, 238, 0.06),
+    0 20px 40px -12px rgba(0, 0, 0, 0.65);
+  transform: translateY(-2px);
+}
+.glass-card:active {
+  transform: translateY(0px) scale(0.99);
+  transition-duration: 0.08s;
+}
+
+/* Interactive row — flat hover without lift */
+.row-interactive {
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.row-interactive:hover {
+  background: rgba(30, 41, 59, 0.7);
+}
+
+/* Palantir-style node hover glow */
+.node-hover {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.node-hover:hover {
+  box-shadow: 0 0 16px rgba(34, 211, 238, 0.35);
+}
+
+/* ─── Skeleton shimmer ────────────────────────────────────────────────────── */
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(30, 41, 59, 0.8) 25%,
+    rgba(51, 65, 85, 0.6) 50%,
+    rgba(30, 41, 59, 0.8) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+/* ─── Animations ──────────────────────────────────────────────────────────── */
+
+@keyframes aether-fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+@keyframes aether-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes aether-slide-right {
+  from { opacity: 0; transform: translateX(28px); }
+  to   { opacity: 1; transform: translateX(0);    }
+}
+
+@keyframes aether-slide-up {
+  from { opacity: 0; transform: translateY(20px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);    }
+}
+
+@keyframes aether-scale-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1);    }
+}
+
+@keyframes aether-glow-pulse {
+  0%, 100% { box-shadow: 0 0 12px rgba(34, 211, 238, 0.2); }
+  50%       { box-shadow: 0 0 28px rgba(34, 211, 238, 0.55); }
+}
+
+@keyframes aether-dot-ping {
+  0%   { transform: scale(1);   opacity: 1; }
+  75%  { transform: scale(1.8); opacity: 0; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+
+@keyframes aether-border-glow {
+  0%, 100% { border-color: rgba(34, 211, 238, 0.2); }
+  50%       { border-color: rgba(34, 211, 238, 0.5); }
+}
+
+.aether-fade-up    { animation: aether-fade-up    0.3s  cubic-bezier(0.16, 1, 0.3, 1) both; }
+.aether-fade-in    { animation: aether-fade-in    0.2s  ease both; }
+.aether-slide-right{ animation: aether-slide-right 0.32s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.aether-slide-up   { animation: aether-slide-up   0.28s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.aether-scale-in   { animation: aether-scale-in   0.22s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.aether-glow-pulse { animation: aether-glow-pulse  2.5s ease-in-out infinite; }
+.aether-dot-ping   { animation: aether-dot-ping    1.5s ease-in-out infinite; }
+.aether-border-glow{ animation: aether-border-glow  2s  ease-in-out infinite; }
+
+/* Staggered list children — up to 12 items */
+.aether-stagger > * { animation: aether-fade-up 0.28s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.aether-stagger > *:nth-child(1)   { animation-delay:   0ms; }
+.aether-stagger > *:nth-child(2)   { animation-delay:  45ms; }
+.aether-stagger > *:nth-child(3)   { animation-delay:  90ms; }
+.aether-stagger > *:nth-child(4)   { animation-delay: 135ms; }
+.aether-stagger > *:nth-child(5)   { animation-delay: 180ms; }
+.aether-stagger > *:nth-child(6)   { animation-delay: 225ms; }
+.aether-stagger > *:nth-child(7)   { animation-delay: 270ms; }
+.aether-stagger > *:nth-child(8)   { animation-delay: 315ms; }
+.aether-stagger > *:nth-child(9)   { animation-delay: 360ms; }
+.aether-stagger > *:nth-child(10)  { animation-delay: 405ms; }
+.aether-stagger > *:nth-child(11)  { animation-delay: 450ms; }
+.aether-stagger > *:nth-child(n+12){ animation-delay: 495ms; }
+
+/* Grid stagger — use on a grid container */
+.aether-grid-stagger > * { animation: aether-fade-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.aether-grid-stagger > *:nth-child(1) { animation-delay:   0ms; }
+.aether-grid-stagger > *:nth-child(2) { animation-delay:  60ms; }
+.aether-grid-stagger > *:nth-child(3) { animation-delay: 120ms; }
+.aether-grid-stagger > *:nth-child(4) { animation-delay: 180ms; }
+.aether-grid-stagger > *:nth-child(5) { animation-delay: 240ms; }
+.aether-grid-stagger > *:nth-child(6) { animation-delay: 300ms; }
+.aether-grid-stagger > *:nth-child(n+7){ animation-delay: 360ms; }
+
+/* ─── Interactive press scale ─────────────────────────────────────────────── */
+
+.press-scale {
+  transition: transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.press-scale:active { transform: scale(0.96); }
+
+/* ─── Glow button ─────────────────────────────────────────────────────────── */
+
+.btn-glow {
+  transition: box-shadow 0.2s ease, transform 0.15s ease, background 0.15s ease;
+}
+.btn-glow:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 24px rgba(34, 211, 238, 0.35), 0 8px 20px rgba(0, 0, 0, 0.3);
+}
+.btn-glow:active {
+  transform: translateY(0);
+  box-shadow: none;
+  transition-duration: 0.08s;
+}
+
+/* ─── Stat chip ───────────────────────────────────────────────────────────── */
+
+.stat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  border-radius: 99px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  transition: border-color 0.2s ease;
+}
+.stat-chip:hover {
+  border-color: rgba(34, 211, 238, 0.3);
+}
+
+/* ─── Leaflet / map dark theme ────────────────────────────────────────────── */
+
+.custom-popup .leaflet-popup-content-wrapper {
+  background: #1E2937;
+  color: #E2E8F0;
+  border-radius: 12px;
+  border: 1px solid #334155;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+.custom-popup .leaflet-popup-tip { background: #1E2937; }
+
+/* ─── ReactFlow overrides ─────────────────────────────────────────────────── */
+
+.react-flow__controls {
+  background: rgba(15, 23, 42, 0.92) !important;
+  border: 1px solid rgba(51, 65, 85, 0.8) !important;
+  border-radius: 14px !important;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
+}
+.react-flow__controls-button {
+  background: transparent !important;
+  border-bottom-color: rgba(51, 65, 85, 0.6) !important;
+  color: #94A3B8 !important;
+  fill: #94A3B8 !important;
+  transition: background 0.15s ease, fill 0.15s ease !important;
+}
+.react-flow__controls-button:hover {
+  background: rgba(34, 211, 238, 0.1) !important;
+  fill: #22D3EE !important;
+}
+.react-flow__minimap {
+  background: rgba(15, 23, 42, 0.92) !important;
+  border: 1px solid rgba(51, 65, 85, 0.8) !important;
+  border-radius: 14px !important;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
+}
+.react-flow__edge-path {
+  transition: stroke 0.18s ease, stroke-width 0.18s ease, opacity 0.18s ease;
+}
+.react-flow__attribution { display: none !important; }
+
+/* ─── Modal backdrop ──────────────────────────────────────────────────────── */
+
+.modal-backdrop {
+  animation: aether-fade-in 0.18s ease both;
+}
+.modal-panel {
+  animation: aether-slide-up 0.26s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ─── Sidebar slide-in from left (mobile) ──────────────────────────────────── */
+
+@keyframes aether-slide-left {
+  from { opacity: 0; transform: translateX(-20px); }
+  to   { opacity: 1; transform: translateX(0);     }
+}
+.aether-slide-left { animation: aether-slide-left 0.28s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* ─── Mobile touch improvements ─────────────────────────────────────────────── */
+
+/* Minimum 44×44 touch targets on small screens */
+@media (max-width: 1023px) {
+  .touch-target {
+    min-height: 44px;
+    min-width:  44px;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Momentum scroll on iOS */
+.scroll-touch {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* Stronger active press feedback on touch */
+.press-scale:active { transform: scale(0.94); }
+
+/* Bottom-nav safe area for notched devices */
+.pb-safe {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
+}
+
+/* NodeDetailPanel: slide up from bottom on phones instead of from right */
+@media (max-width: 639px) {
+  .aether-slide-right {
+    animation: aether-slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
 }
