@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import {
   X, Settings, Download, Trash2, Focus, Keyboard, Command,
-  Database, Layers, Info, User, Check,
+  Database, Layers, Info, User, Check, Upload,
 } from 'lucide-react';
 import { useAetherStore } from '@/lib/store';
 import { exportAsJSON, exportAllWorkspaces } from '@/lib/export';
@@ -16,6 +16,8 @@ interface SettingsPanelProps {
   onOpenShortcuts: () => void;
   onOpenPalette: () => void;
   onReset: () => void;
+  /** Opens the shared file picker (graph or workspaces JSON). */
+  onImportClick?: () => void;
 }
 
 function Section({
@@ -70,6 +72,7 @@ export default function SettingsPanel({
   onOpenShortcuts,
   onOpenPalette,
   onReset,
+  onImportClick,
 }: SettingsPanelProps) {
   const {
     data,
@@ -258,6 +261,23 @@ export default function SettingsPanel({
               >
                 <Download size={12} />
                 {exported === 'all' ? 'Done' : 'Export'}
+              </button>
+            </Row>
+            <Row
+              label="Import backup"
+              description="Single graph or multi-workspace JSON (merge or replace)"
+            >
+              <button
+                type="button"
+                disabled={!onImportClick}
+                onClick={() => {
+                  onClose();
+                  onImportClick?.();
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 text-xs text-slate-300 hover:border-slate-500 hover:text-white transition-colors disabled:opacity-40"
+              >
+                <Upload size={12} />
+                Import
               </button>
             </Row>
             <Row

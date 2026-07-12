@@ -159,6 +159,19 @@ interface AetherStore {
   /** Per-workspace graphs. Switching workspaces loads the matching entry. */
   workspaceData: Record<string, AetherData>;
   setData: (data: AetherData) => void;
+  /**
+   * Load a multi-workspace backup.
+   * - replace: wipe all workspaces and load the bundle
+   * - merge: append imported workspaces (re-ids on collision)
+   */
+  importWorkspaces: (
+    payload: {
+      workspaces: Workspace[];
+      workspaceData: Record<string, AetherData>;
+      currentWorkspaceId: string;
+    },
+    mode: 'replace' | 'merge'
+  ) => void;
 
   addNode: (node: OntologyNode) => void;
   addNodes: (nodes: OntologyNode[]) => void;
@@ -286,6 +299,77 @@ export const useAetherStore = create<AetherStore>()(
 
       setData: (data) =>
         set((state) => withHistoryAndData(state, data)),
+
+      importWorkspaces: (payload, mode) =>
+        set((state) => {
+          if (mode === 'replace') {
+            const data =
+              payload.workspaceData[payload.currentWorkspaceId] ?? emptyGraph();
+            return {
+              workspaces: payload.workspaces.map((w) => ({ ...w })),
+              workspaceData: Object.fromEntries(
+                Object.entries(payload.workspaceData).map(([id, g]) => [
+                  id,
+                  cloneGraph(g),
+                ])
+              ),
+              currentWorkspaceId: payload.currentWorkspaceId,
+              data: cloneGraph(data),
+              history: {},
+              selectedNode: null,
+              graphFocus: null,
+              isPathFinderOpen: false,
+              pathFinderFromId: undefined,
+              snapshots: [],
+              savedInsights: [],
+            };
+          }
+
+          // merge — re-id on collision so existing workspaces stay intact
+          const existingIds = new Set(state.workspaces.map((w) => w.id));
+          const idMap = new Map<string, string>();
+          const stamp = Date.now().toString(36);
+          let seq = 0;
+
+          const incoming: Workspace[] = [];
+          const incomingData: Record<string, AetherData> = {};
+
+          for (const ws of payload.workspaces) {
+            let id = ws.id;
+            if (existingIds.has(id) || idMap.has(ws.id)) {
+              id = `ws-import-${stamp}-${(seq++).toString(36)}`;
+            }
+            idMap.set(ws.id, id);
+            existingIds.add(id);
+            incoming.push({
+              ...ws,
+              id,
+              name:
+                ws.id !== id && state.workspaces.some((w) => w.name === ws.name)
+                  ? `${ws.name} (imported)`
+                  : ws.name,
+            });
+            incomingData[id] = cloneGraph(
+              payload.workspaceData[ws.id] ?? emptyGraph()
+            );
+          }
+
+          const workspaceData = {
+            ...state.workspaceData,
+            [state.currentWorkspaceId]: state.data,
+            ...incomingData,
+          };
+
+          return {
+            workspaces: [...state.workspaces, ...incoming],
+            workspaceData,
+            // stay on current workspace
+            data: state.data,
+            currentWorkspaceId: state.currentWorkspaceId,
+            selectedNode: null,
+            graphFocus: null,
+          };
+        }),
 
       addNode: (node) =>
         set((state) =>
