@@ -2,13 +2,19 @@ import OpenAI from 'openai';
 import { NextRequest } from 'next/server';
 import type { AnalysisResult, AnalysisIntent } from '@/lib/ai-search';
 import { detectIntent } from '@/lib/ai-search';
+import {
+  selectAnalysisContext,
+  serializeContextForPrompt,
+} from '@/lib/ai-context';
 import type { AetherData } from '@/types';
 
-const SYSTEM_PROMPT = `You are an intelligence analyst for Aether, a personal knowledge OS. You receive a user query and a JSON snapshot of their ontology graph, then return structured analysis as JSON.
+const SYSTEM_PROMPT = `You are an intelligence analyst for Aether, a personal knowledge OS. You receive a user query and a JSON snapshot of their ontology graph (often a relevance-ranked subgraph), then return structured analysis as JSON.
 
 The ontology contains nodes (entities) of these types: Person, Project, Location, Metric, Insight, Event, Document.
 Each node has: id, type, label, createdAt, properties (varies by type), tags[].
-Relationships have: id, type, from (node id), to (node id), label.
+Relationships have: id, type, from (node id), to (node id).
+
+The payload may include selectionNote describing how the subgraph was chosen. Base answers only on the provided nodes/relationships; if context looks truncated, say so when confidence is limited.
 
 Your response MUST be valid JSON matching this exact shape:
 {
@@ -31,49 +37,10 @@ Rules:
 - keyFindings: 3-6 specific, data-grounded observations. Use ⚠ prefix for risks.
 - recommendations: 3-4 concrete, actionable next steps.
 - metrics: only include when numerically relevant (financial, projects, risk). Omit the field if not applicable.
-- confidenceScore: reflect how much relevant data exists (sparse graph = lower score).
+- confidenceScore: reflect how much relevant data exists (sparse or truncated graph = lower score).
 - relatedNodeIds: ids of nodes most relevant to the answer.
 - reasoningTrace.dataPoints: 3-5 plain-English statements describing what you examined.
 - Do not include markdown, only JSON.`;
-
-function buildContextSummary(data: AetherData, intent: AnalysisIntent): string {
-  const nodes = data.nodes.map((n) => ({
-    id: n.id,
-    type: n.type,
-    label: n.label,
-    createdAt: n.createdAt,
-    properties: n.properties,
-    tags: n.tags ?? [],
-  }));
-
-  const rels = data.relationships.map((r) => ({
-    id: r.id,
-    type: r.type,
-    from: r.from,
-    to: r.to,
-  }));
-
-  // Focus the context based on intent to keep token count manageable
-  const intentNodeTypes: Record<AnalysisIntent, string[]> = {
-    financial:            ['Project', 'Metric'],
-    risk:                 ['Project', 'Person'],
-    team:                 ['Person', 'Project'],
-    projects:             ['Project'],
-    location:             ['Location', 'Project'],
-    opportunity:          ['Metric', 'Project', 'Location'],
-    summary:              [],          // all types
-    connection_discovery: [],          // all types
-    scenario_projection:  ['Metric', 'Project'],
-    search:               [],          // all types
-  };
-
-  const focusTypes = intentNodeTypes[intent];
-  const relevantNodes = focusTypes.length === 0
-    ? nodes
-    : nodes.filter((n) => focusTypes.includes(n.type));
-
-  return JSON.stringify({ nodes: relevantNodes, relationships: rels }, null, 0);
-}
 
 export async function POST(request: NextRequest) {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -94,7 +61,12 @@ export async function POST(request: NextRequest) {
   }
 
   const intent = detectIntent(query);
-  const graphSummary = buildContextSummary(context.data, intent);
+  const selection = selectAnalysisContext(context.data, query, intent, {
+    maxNodes: 40,
+    maxRels: 80,
+    expandNeighbors: true,
+  });
+  const graphSummary = serializeContextForPrompt(selection);
 
   const client = new OpenAI({ apiKey });
 
@@ -118,16 +90,34 @@ export async function POST(request: NextRequest) {
 
     // Ensure required fields are present with safe defaults
     const result: AnalysisResult = {
-      intent:           (parsed.intent as AnalysisIntent) ?? intent,
-      confidence:       parsed.confidence ?? 'medium',
-      confidenceScore:  parsed.confidenceScore ?? 50,
-      summary:          parsed.summary ?? '',
-      keyFindings:      parsed.keyFindings ?? [],
-      recommendations:  parsed.recommendations ?? [],
-      relatedNodeIds:   parsed.relatedNodeIds ?? [],
-      metrics:          parsed.metrics,
-      reasoningTrace:   parsed.reasoningTrace ?? { nodesAnalyzed: [], relsAnalyzed: [], dataPoints: [] },
+      intent: (parsed.intent as AnalysisIntent) ?? intent,
+      confidence: parsed.confidence ?? 'medium',
+      confidenceScore: parsed.confidenceScore ?? 50,
+      summary: parsed.summary ?? '',
+      keyFindings: parsed.keyFindings ?? [],
+      recommendations: parsed.recommendations ?? [],
+      relatedNodeIds: parsed.relatedNodeIds ?? selection.selectedNodeIds.slice(0, 8),
+      metrics: parsed.metrics,
+      reasoningTrace: parsed.reasoningTrace ?? {
+        nodesAnalyzed: selection.selectedNodeIds.slice(0, 12),
+        relsAnalyzed: selection.data.relationships.map((r) => r.id).slice(0, 12),
+        dataPoints: [selection.selectionNote],
+      },
     };
+
+    // Ensure trace mentions selection when model omits it
+    if (
+      selection.truncated &&
+      result.reasoningTrace &&
+      !result.reasoningTrace.dataPoints.some((d) =>
+        d.toLowerCase().includes('subgraph') || d.toLowerCase().includes('ranked')
+      )
+    ) {
+      result.reasoningTrace = {
+        ...result.reasoningTrace,
+        dataPoints: [selection.selectionNote, ...result.reasoningTrace.dataPoints].slice(0, 6),
+      };
+    }
 
     return Response.json(result);
   } catch (err) {
