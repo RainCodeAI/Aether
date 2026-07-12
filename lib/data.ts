@@ -1,93 +1,195 @@
-// lib/data.ts
+// lib/data.ts — seed graph for the default Personal workspace
 import { OntologyNode, Relationship, AetherData } from '@/types';
+
+export const EMPTY_AETHER_DATA: AetherData = {
+  nodes: [],
+  relationships: [],
+};
 
 export const mockNodes: OntologyNode[] = [
   {
-    id: "p1",
-    type: "Person",
-    label: "Avery Miller",
+    id: 'p1',
+    type: 'Person',
+    label: 'Avery Miller',
     properties: {
-      role: "Founder",
-      email: "avery@stratford.ca",
-      location: "Stratford, ON",
-      joined: "2024"
+      role: 'Founder',
+      email: 'avery@stratford.ca',
+      location: 'Stratford, ON',
+      joined: '2024',
     },
-    createdAt: "2026-05-01"
+    tags: ['founder', 'leadership'],
+    createdAt: '2026-05-01',
   },
   {
-    id: "proj1",
-    type: "Project",
-    label: "Q3 Product Launch",
+    id: 'p2',
+    type: 'Person',
+    label: 'Jordan Chen',
     properties: {
-      status: "Active",
+      role: 'Engineer',
+      email: 'jordan@stratford.ca',
+      location: 'Toronto, ON',
+      joined: '2025',
+    },
+    tags: ['engineering'],
+    createdAt: '2026-02-12',
+  },
+  {
+    id: 'p3',
+    type: 'Person',
+    label: 'Sam Rivera',
+    properties: {
+      role: 'Product Manager',
+      email: 'sam@stratford.ca',
+      location: 'Stratford, ON',
+    },
+    tags: ['product'],
+    createdAt: '2026-03-01',
+  },
+  {
+    id: 'proj1',
+    type: 'Project',
+    label: 'Q3 Product Launch',
+    properties: {
+      status: 'Active',
       budget: 45000,
-      priority: "High",
-      progress: 65
+      priority: 'High',
+      progress: 65,
+      startDate: '2026-04-01',
+      endDate: '2026-09-30',
     },
-    createdAt: "2026-04-15"
+    tags: ['product', 'launch'],
+    createdAt: '2026-04-15',
   },
   {
-    id: "proj2",
-    type: "Project",
-    label: "Ontario Market Expansion",
+    id: 'proj2',
+    type: 'Project',
+    label: 'Ontario Market Expansion',
     properties: {
-      status: "Planning",
+      status: 'Planning',
       budget: 28000,
-      priority: "Medium"
+      priority: 'Medium',
+      progress: 15,
+      startDate: '2026-06-01',
+      endDate: '2026-12-15',
     },
-    createdAt: "2026-03-20"
+    tags: ['growth', 'geo'],
+    createdAt: '2026-03-20',
   },
   {
-    id: "loc1",
-    type: "Location",
-    label: "Stratford Tech Hub",
+    id: 'proj3',
+    type: 'Project',
+    label: 'Data Pipeline Hardening',
     properties: {
-      city: "Stratford",
-      province: "Ontario",
-      type: "Office",
-      coordinates: { lat: 43.37, lng: -80.98 }
+      status: 'At Risk',
+      budget: 18000,
+      priority: 'High',
+      progress: 35,
+      startDate: '2026-03-15',
+      endDate: '2026-07-31',
     },
-    createdAt: "2026-01-10"
+    tags: ['infra', 'engineering'],
+    createdAt: '2026-03-15',
   },
   {
-    id: "m1",
-    type: "Metric",
-    label: "Monthly Revenue",
-    properties: { value: 12400, unit: "CAD", trend: "up" },
-    createdAt: "2026-05-01"
-  }
+    id: 'proj4',
+    type: 'Project',
+    label: 'Customer Portal v2',
+    properties: {
+      status: 'Complete',
+      budget: 32000,
+      priority: 'Medium',
+      progress: 100,
+      startDate: '2025-11-01',
+      endDate: '2026-03-01',
+    },
+    tags: ['product'],
+    createdAt: '2025-11-01',
+  },
+  {
+    id: 'loc1',
+    type: 'Location',
+    label: 'Stratford Tech Hub',
+    properties: {
+      city: 'Stratford',
+      province: 'Ontario',
+      type: 'Office',
+      coordinates: { lat: 43.37, lng: -80.98 },
+    },
+    tags: ['hq'],
+    createdAt: '2026-01-10',
+  },
+  {
+    id: 'loc2',
+    type: 'Location',
+    label: 'Toronto Satellite',
+    properties: {
+      city: 'Toronto',
+      province: 'Ontario',
+      type: 'Office',
+      coordinates: { lat: 43.6532, lng: -79.3832 },
+    },
+    tags: ['satellite'],
+    createdAt: '2026-02-01',
+  },
+  {
+    id: 'm1',
+    type: 'Metric',
+    label: 'Monthly Revenue',
+    properties: { value: 12400, unit: 'CAD', trend: 'up' },
+    tags: ['finance'],
+    createdAt: '2026-05-01',
+  },
+  {
+    id: 'm2',
+    type: 'Metric',
+    label: 'Active Users',
+    properties: { value: 840, unit: 'users', trend: 'up' },
+    tags: ['product'],
+    createdAt: '2026-05-01',
+  },
+  {
+    id: 'e1',
+    type: 'Event',
+    label: 'Board Review Q2',
+    properties: {
+      type: 'meeting',
+      date: '2026-06-20',
+      status: 'scheduled',
+    },
+    tags: ['leadership'],
+    createdAt: '2026-05-10',
+  },
+  {
+    id: 'd1',
+    type: 'Document',
+    label: 'Go-to-Market Brief',
+    properties: {
+      format: 'PDF',
+      status: 'draft',
+    },
+    tags: ['gtm'],
+    createdAt: '2026-04-22',
+  },
 ];
 
 export const mockRelationships: Relationship[] = [
-  {
-    id: "r1",
-    from: "p1",
-    to: "proj1",
-    type: "worksOn",
-    properties: { role: "Lead" }
-  },
-  {
-    id: "r2",
-    from: "proj1",
-    to: "loc1",
-    type: "locatedAt"
-  },
-  {
-    id: "r3",
-    from: "p1",
-    to: "proj2",
-    type: "worksOn",
-    properties: { role: "Advisor" }
-  },
-  {
-    id: "r4",
-    from: "proj1",
-    to: "m1",
-    type: "hasMetric"
-  }
+  { id: 'r1', from: 'p1', to: 'proj1', type: 'worksOn', properties: { role: 'Lead' } },
+  { id: 'r2', from: 'p2', to: 'proj1', type: 'worksOn', properties: { role: 'Engineer' } },
+  { id: 'r3', from: 'p3', to: 'proj1', type: 'worksOn', properties: { role: 'PM' } },
+  { id: 'r4', from: 'p1', to: 'proj2', type: 'worksOn', properties: { role: 'Advisor' } },
+  { id: 'r5', from: 'p2', to: 'proj3', type: 'worksOn', properties: { role: 'Lead' } },
+  { id: 'r6', from: 'p3', to: 'proj4', type: 'worksOn', properties: { role: 'PM' } },
+  { id: 'r7', from: 'proj1', to: 'loc1', type: 'locatedAt' },
+  { id: 'r8', from: 'proj2', to: 'loc2', type: 'locatedAt' },
+  { id: 'r9', from: 'proj3', to: 'loc1', type: 'locatedAt' },
+  { id: 'r10', from: 'proj1', to: 'm1', type: 'hasMetric' },
+  { id: 'r11', from: 'proj1', to: 'm2', type: 'hasMetric' },
+  { id: 'r12', from: 'proj1', to: 'd1', type: 'hasDocument' },
+  { id: 'r13', from: 'p1', to: 'e1', type: 'participatedIn' },
+  { id: 'r14', from: 'd1', to: 'proj2', type: 'mentions' },
 ];
 
 export const initialAetherData: AetherData = {
   nodes: mockNodes,
-  relationships: mockRelationships
+  relationships: mockRelationships,
 };

@@ -2,8 +2,9 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Clock, GitBranch, ArrowRight, Layers } from 'lucide-react';
+import { Clock, GitBranch, ArrowRight, SlidersHorizontal, Plus } from 'lucide-react';
 import { useAetherStore } from '@/lib/store';
+import EmptyState from '@/components/ui/EmptyState';
 import { OntologyNode, EntityType, Relationship } from '@/types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -284,7 +285,7 @@ function RelationshipCard({
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function TimelineView() {
-  const { data, setSelectedNode } = useAetherStore();
+  const { data, setSelectedNode, setNewEntityModalOpen } = useAetherStore();
   const [activeFilter, setActiveFilter] = useState<FilterOption>('All');
 
   // Build flat list of timeline entries
@@ -413,16 +414,35 @@ export default function TimelineView() {
         })}
       </div>
 
-      {/* ── Empty state ── */}
-      {groups.length === 0 && (
-        <div className="glass rounded-3xl p-20 text-center border border-slate-800/80 aether-fade-up">
-          <div className="w-16 h-16 rounded-2xl bg-slate-800/60 border border-slate-700/60 flex items-center justify-center mx-auto mb-5">
-            <Layers size={24} className="text-slate-600" />
-          </div>
-          <h3 className="text-lg font-semibold mb-2 text-slate-300">Nothing here yet</h3>
-          <p className="text-slate-600 max-w-sm mx-auto text-sm leading-relaxed">
-            Add entities or create relationships to see them appear on your timeline.
-          </p>
+      {/* ── Empty states ── */}
+      {groups.length === 0 && allEntries.length === 0 && (
+        <div className="glass rounded-3xl border border-slate-800/80">
+          <EmptyState
+            icon={Clock}
+            color="slate"
+            title="Timeline is clear"
+            description="Add entities and create relationships — every change appears here in chronological order, newest first."
+            actions={[
+              { label: 'Add Entity', icon: Plus, onClick: () => setNewEntityModalOpen(true) },
+            ]}
+            hint="Relationships you create are timestamped and show up as events too"
+            size="md"
+          />
+        </div>
+      )}
+
+      {groups.length === 0 && allEntries.length > 0 && (
+        <div className="glass rounded-3xl border border-slate-800/80">
+          <EmptyState
+            icon={SlidersHorizontal}
+            color="slate"
+            title={`No ${activeFilter === 'All' ? '' : activeFilter + ' '}entries found`}
+            description="Nothing matches this filter. Try selecting a different type, or switch back to All to see the full timeline."
+            actions={[
+              { label: 'Show all', onClick: () => setActiveFilter('All'), variant: 'ghost' },
+            ]}
+            size="md"
+          />
         </div>
       )}
 

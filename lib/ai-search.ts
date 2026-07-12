@@ -63,13 +63,25 @@ export async function runLLMAnalysis(
   query: string,
   context: { data: AetherData }
 ): Promise<AnalysisResult> {
-  // TODO: replace with real LLM call, e.g.:
-  // const response = await fetch('/api/grok', {
-  //   method: 'POST',
-  //   body: JSON.stringify({ query, context }),
-  // });
-  // return response.json();
-  return generateInsight(context.data, query);
+  try {
+    const response = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, context }),
+    });
+    if (!response.ok) {
+      // 503 = no API key configured; fall back silently to rule engine
+      return generateInsight(context.data, query);
+    }
+    const result = await response.json() as AnalysisResult;
+    // Sanity-check the response has required fields before trusting it
+    if (!result.summary || !Array.isArray(result.keyFindings)) {
+      return generateInsight(context.data, query);
+    }
+    return result;
+  } catch {
+    return generateInsight(context.data, query);
+  }
 }
 
 // ─── Search ───────────────────────────────────────────────────────────────────
@@ -865,6 +877,86 @@ export function generateAutoInsights(data: AetherData): AutoInsight[] {
       return order[a.severity] - order[b.severity];
     })
     .slice(0, 3);
+}
+
+// ─── Random insight ───────────────────────────────────────────────────────────
+
+/**
+ * Intelligently selects an analysis query based on what data is actually present.
+ * Each candidate is weighted — data-rich angles are preferred over generic ones.
+ * Returns a query string; pass it to setSearchQuery() and the AI panel auto-fires.
+ */
+export function getRandomInsight(data: AetherData): string {
+  const types = new Set(data.nodes.map(n => n.type));
+
+  // [weight, query] — higher weight = more likely to be selected
+  const pool: [number, string][] = [
+    // Always available (lower weight so specific insights win when data is rich)
+    [2, 'connection discovery'],
+    [2, 'full summary overview'],
+    [2, 'opportunity analysis'],
+    [2, 'scenario projection forecast'],
+  ];
+
+  if (types.has('Person')) {
+    pool.push(
+      [4, 'team overview'],
+      [3, 'key person dependencies'],
+      [2, 'org coverage and role gaps'],
+    );
+  }
+
+  if (types.has('Project')) {
+    pool.push(
+      [4, 'project portfolio status'],
+      [4, 'risk assessment'],
+      [3, 'delivery health overview'],
+    );
+  }
+
+  if (types.has('Metric')) {
+    pool.push(
+      [4, 'financial overview'],
+      [3, 'performance metrics analysis'],
+    );
+  }
+
+  if (types.has('Location')) {
+    pool.push(
+      [3, 'location overview'],
+      [2, 'geospatial distribution'],
+    );
+  }
+
+  if (types.has('Event')) {
+    pool.push([3, 'upcoming events and milestones']);
+  }
+
+  // Cross-type combos — most interesting when both sides exist
+  if (types.has('Person') && types.has('Project')) {
+    pool.push([5, 'who is working on what']);
+  }
+
+  if (types.has('Project') && types.has('Metric')) {
+    pool.push([5, 'project financial health']);
+  }
+
+  if (types.has('Person') && types.has('Location')) {
+    pool.push([4, 'team geographic spread']);
+  }
+
+  if (types.has('Person') && types.has('Project') && types.has('Metric')) {
+    pool.push([5, 'executive overview']);
+  }
+
+  // Weighted random selection
+  const total = pool.reduce((sum, [w]) => sum + w, 0);
+  let rand = Math.random() * total;
+  for (const [weight, query] of pool) {
+    rand -= weight;
+    if (rand <= 0) return query;
+  }
+  return pool[pool.length - 1][1];
 }
 
 // ─── Node factory ─────────────────────────────────────────────────────────────

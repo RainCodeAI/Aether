@@ -64,15 +64,15 @@ body {
   transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 .glass-card:hover {
-  border-color: rgba(34, 211, 238, 0.25);
+  border-color: rgba(34, 211, 238, 0.32);
   box-shadow:
-    0 0 0 1px rgba(34, 211, 238, 0.08),
-    0 0 24px rgba(34, 211, 238, 0.06),
-    0 20px 40px -12px rgba(0, 0, 0, 0.65);
-  transform: translateY(-2px);
+    0 0 0 1px rgba(34, 211, 238, 0.12),
+    0 0 36px rgba(34, 211, 238, 0.09),
+    0 28px 56px -16px rgba(0, 0, 0, 0.75);
+  transform: translateY(-3px) scale(1.02);
 }
 .glass-card:active {
-  transform: translateY(0px) scale(0.99);
+  transform: translateY(0px) scale(0.97);
   transition-duration: 0.08s;
 }
 
@@ -193,7 +193,7 @@ body {
 .press-scale {
   transition: transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-.press-scale:active { transform: scale(0.96); }
+.press-scale:active { transform: scale(0.95); }
 
 /* ─── Glow button ─────────────────────────────────────────────────────────── */
 
@@ -206,6 +206,21 @@ body {
 }
 .btn-glow:active {
   transform: translateY(0);
+  box-shadow: none;
+  transition-duration: 0.08s;
+}
+
+/* ─── Surprise button ────────────────────────────────────────────────────── */
+
+.surprise-btn {
+  transition: box-shadow 0.2s ease, transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.surprise-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 18px rgba(52, 211, 153, 0.22), 0 6px 16px rgba(0, 0, 0, 0.25);
+}
+.surprise-btn:active {
+  transform: translateY(0) scale(0.96);
   box-shadow: none;
   transition-duration: 0.08s;
 }
@@ -260,14 +275,16 @@ body {
   fill: #22D3EE !important;
 }
 .react-flow__minimap {
-  background: rgba(15, 23, 42, 0.92) !important;
-  border: 1px solid rgba(51, 65, 85, 0.8) !important;
-  border-radius: 14px !important;
+  background: rgba(10, 12, 20, 0.95) !important;
+  border: 1px solid rgba(34, 211, 238, 0.15) !important;
+  border-radius: 16px !important;
   overflow: hidden;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(34, 211, 238, 0.04) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
 }
 .react-flow__edge-path {
-  transition: stroke 0.18s ease, stroke-width 0.18s ease, opacity 0.18s ease;
+  transition: stroke 0.2s ease, stroke-width 0.2s ease, opacity 0.2s ease;
 }
 .react-flow__attribution { display: none !important; }
 
@@ -305,7 +322,7 @@ body {
 }
 
 /* Stronger active press feedback on touch */
-.press-scale:active { transform: scale(0.94); }
+.press-scale:active { transform: scale(0.93); }
 
 /* Bottom-nav safe area for notched devices */
 .pb-safe {
@@ -318,3 +335,71 @@ body {
     animation: aether-slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 }
+
+/* ─── Node pulse (graph click feedback) ──────────────────────────────────────── */
+
+@keyframes aether-node-pulse {
+  0%   { box-shadow: 0 0 0 0   rgba(34, 211, 238, 0.7); }
+  60%  { box-shadow: 0 0 0 14px rgba(34, 211, 238, 0);   }
+  100% { box-shadow: 0 0 0 14px rgba(34, 211, 238, 0);   }
+}
+.aether-node-pulse { animation: aether-node-pulse 0.55s ease-out; }
+
+/* ─── Success pop (modal / entity creation) ──────────────────────────────────── */
+
+@keyframes aether-success-pop {
+  0%   { opacity: 0; transform: scale(0.75); }
+  60%  { opacity: 1; transform: scale(1.08); }
+  100% { opacity: 1; transform: scale(1);    }
+}
+.aether-success-pop { animation: aether-success-pop 0.42s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+/* ─── Toast slide-in from top-right ─────────────────────────────────────────── */
+
+@keyframes aether-toast-in {
+  from { opacity: 0; transform: translateX(14px) scale(0.97); }
+  to   { opacity: 1; transform: translateX(0)     scale(1);   }
+}
+.aether-toast { animation: aether-toast-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* ─── View transition (switching between nav views) ──────────────────────────── */
+
+@keyframes aether-view-enter {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+.aether-view-enter { animation: aether-view-enter 0.28s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* ─── Table row stagger (tbody > tr) ─────────────────────────────────────────── */
+
+.table-stagger > tr { animation: aether-fade-up 0.22s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.table-stagger > tr:nth-child(1)    { animation-delay:   0ms; }
+.table-stagger > tr:nth-child(2)    { animation-delay:  28ms; }
+.table-stagger > tr:nth-child(3)    { animation-delay:  56ms; }
+.table-stagger > tr:nth-child(4)    { animation-delay:  84ms; }
+.table-stagger > tr:nth-child(5)    { animation-delay: 112ms; }
+.table-stagger > tr:nth-child(6)    { animation-delay: 140ms; }
+.table-stagger > tr:nth-child(7)    { animation-delay: 168ms; }
+.table-stagger > tr:nth-child(8)    { animation-delay: 196ms; }
+.table-stagger > tr:nth-child(n+9)  { animation-delay: 224ms; }
+
+/* ─── Progress bar animated fill ─────────────────────────────────────────────── */
+
+.progress-fill {
+  transition: width 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ─── Tooltip fade-in ─────────────────────────────────────────────────────────── */
+/*
+ * --tt-dx / --tt-dy are set per-instance by Tooltip.tsx to match the side the
+ * tooltip appears on, producing a directional "emerges from the trigger" feel:
+ *   top    → dy: +5px  (starts below, slides up)
+ *   bottom → dy: -5px  (starts above, slides down)
+ *   left   → dx: +5px  (starts right, slides left)
+ *   right  → dx: -5px  (starts left, slides right)
+ */
+@keyframes aether-tooltip-in {
+  from { opacity: 0; transform: translate(var(--tt-dx, 0px), var(--tt-dy, 5px)) scale(0.95); }
+  to   { opacity: 1; transform: translate(0, 0) scale(1); }
+}
+.aether-tooltip { animation: aether-tooltip-in 0.13s cubic-bezier(0.16, 1, 0.3, 1) both; }

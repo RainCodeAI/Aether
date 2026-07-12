@@ -12,7 +12,7 @@ export interface OntologyNode {
   id: string;
   type: EntityType;
   label: string;
-  properties: Record<string, any>;
+  properties: Record<string, unknown>;
   tags?: string[];
   createdAt?: string;
 }
@@ -22,7 +22,7 @@ export interface Relationship {
   from: string;
   to: string;
   type: string; // e.g. "worksOn", "locatedAt", "hasMetric", "participatedIn"
-  properties?: Record<string, any>;
+  properties?: Record<string, unknown>;
 }
 
 export interface AetherData {

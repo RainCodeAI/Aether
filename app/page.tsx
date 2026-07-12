@@ -3,6 +3,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import Sidebar from '@/components/layout/Sidebar';
+import CommandBar from '@/components/layout/CommandBar';
 import OntologyGraph from '@/components/ontology/OntologyGraph';
 import NodeDetailPanel from '@/components/ontology/NodeDetailPanel';
 import AetherMap from '@/components/geospatial/AetherMap';
@@ -15,15 +16,21 @@ import KanbanView from '@/components/views/KanbanView';
 import DataView from '@/components/data/DataView';
 import PDFUploadModal from '@/components/data/PDFUploadModal';
 import CalendarView from '@/components/calendar/CalendarView';
-import WorkspaceSwitcher from '@/components/collaboration/WorkspaceSwitcher';
+import ReportGenerator from '@/components/reports/ReportGenerator';
 import { useAetherStore } from '@/lib/store';
 import {
-  Search, Bell, Plus, Lightbulb, ArrowRight, Sparkles, ChevronRight,
+  Search, Plus, ArrowRight, Sparkles, ChevronRight,
   Upload, AlertTriangle, CheckCircle2, XCircle, X,
-  FolderOpen, Users, BarChart3, Zap, TrendingUp, ShieldAlert,
-  LayoutGrid, Table2, Columns2, Eye, Menu, FileText,
+  FolderOpen, LayoutGrid, Table2, Columns2, Eye, FileText, BookOpen,
+  Network, SearchX, Shuffle,
 } from 'lucide-react';
-import { searchOntology, generateAutoInsights, AutoInsight } from '@/lib/ai-search';
+import { searchOntology, getRandomInsight } from '@/lib/ai-search';
+import { TipKbd } from '@/components/ui/Tooltip';
+import DraggableRightColumn from '@/components/dashboard/DraggableRightColumn';
+import EmptyState from '@/components/ui/EmptyState';
+import Tooltip from '@/components/ui/Tooltip';
+import ShortcutsModal from '@/components/ui/ShortcutsModal';
+import { useKeyboardShortcuts } from '@/lib/hooks/useKeyboardShortcuts';
 import { exportAsJSON, exportAsCSV, exportGraphAsPNG } from '@/lib/export';
 import { importFromJSON, ImportResult } from '@/lib/import';
 import { getShareTokenFromUrl, ShareToken } from '@/lib/share';
@@ -40,7 +47,7 @@ function Toast({ toast, onDismiss }: { toast: ToastState; onDismiss: () => void 
   const isSuccess = toast.type === 'success';
   return (
     <div
-      className={`fixed top-6 right-6 z-[100] flex items-start gap-3 rounded-2xl p-4 max-w-sm shadow-2xl border backdrop-blur-sm ${
+      className={`fixed top-6 right-6 z-[100] flex items-start gap-3 rounded-2xl p-4 max-w-sm shadow-2xl border backdrop-blur-sm aether-toast ${
         isSuccess
           ? 'bg-emerald-950/95 border-emerald-500/30'
           : 'bg-rose-950/95 border-rose-500/30'
@@ -164,31 +171,45 @@ export default function AetherDashboard() {
     searchQuery, setSearchQuery,
     currentView, setCurrentView,
     isNewEntityModalOpen, setNewEntityModalOpen,
-    selectedNode, setSelectedNode,
-    isAIAnalystOpen, setAIAnalystOpen,
+    setSelectedNode,
+    setAIAnalystOpen,
     isPDFUploadModalOpen, setPDFUploadModalOpen,
     pdfLinkedEntityId, setPDFLinkedEntityId,
+    setReportGeneratorOpen, setReportFocusNodeId,
   } = useAetherStore();
 
   // Import state
   const fileInputRef   = useRef<HTMLInputElement>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
   const [importPending,    setImportPending]    = useState<(ImportResult & { filename: string }) | null>(null);
   const [isDragOver,       setIsDragOver]       = useState(false);
   const [toast,            setToast]            = useState<ToastState | null>(null);
   const [projectsSubView,  setProjectsSubView]  = useState<'grid' | 'table' | 'kanban'>('grid');
   const [shareToken,       setShareToken]       = useState<ShareToken | null>(null);
   const [sidebarOpen,      setSidebarOpen]      = useState(false);
+  const [shortcutsOpen,    setShortcutsOpen]    = useState(false);
 
-  // Detect ?share= URL param on mount
+  // ── Centralized keyboard shortcuts ────────────────────────────────────────────
+  useKeyboardShortcuts({
+    isShortcutsOpen:  shortcutsOpen,
+    onOpenShortcuts:  () => setShortcutsOpen(true),
+    onCloseShortcuts: () => setShortcutsOpen(false),
+  });
+
+  // Detect ?share= URL param on mount. This is a one-shot read of external browser
+  // state (the URL), not derivable during render without a hydration mismatch — a
+  // lazy useState initializer returns null on the server but the token on the client.
   useEffect(() => {
     const token = getShareTokenFromUrl();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-only external read, runs once
     if (token) setShareToken(token);
   }, []);
 
-  // Close sidebar on route change (view change)
-  const { currentView: _cv } = useAetherStore();
-  useEffect(() => { setSidebarOpen(false); }, [_cv]);
+  // Close sidebar when the view changes (render-phase pattern, avoids a cascading effect).
+  const [prevView, setPrevView] = useState(currentView);
+  if (currentView !== prevView) {
+    setPrevView(currentView);
+    setSidebarOpen(false);
+  }
 
   // Auto-dismiss toast after 5 s
   useEffect(() => {
@@ -213,19 +234,6 @@ export default function AetherDashboard() {
       document.removeEventListener('dragleave', onLeave);
       document.removeEventListener('drop',      onDrop);
     };
-  }, []);
-
-  // Cmd/Ctrl + K → focus command bar search input
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        searchInputRef.current?.focus();
-        searchInputRef.current?.select();
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
   }, []);
 
   const handleFile = useCallback(async (file: File) => {
@@ -305,93 +313,30 @@ export default function AetherDashboard() {
       {/* Toast notifications */}
       {toast && <Toast toast={toast} onDismiss={() => setToast(null)} />}
 
+      {/* Keyboard shortcuts modal */}
+      <ShortcutsModal isOpen={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+
       {/* Sidebar — fixed overlay on mobile, flex child on desktop */}
-      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        onOpenShortcuts={() => setShortcutsOpen(true)}
+      />
 
       {/* Main Content Area — always full width on mobile (sidebar is fixed overlay) */}
       <div className="flex-1 flex flex-col min-w-0">
 
         {/* Top Command Bar */}
-        <div className="h-14 sm:h-16 border-b border-slate-800 bg-[#0A0A0C]/80 backdrop-blur-md flex items-center justify-between px-3 sm:px-6 lg:px-8 z-10 gap-2 sm:gap-4 shrink-0">
-
-          {/* Left: hamburger (mobile) + greeting (desktop) */}
-          <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
-            <button
-              onClick={() => setSidebarOpen(true)}
-              aria-label="Open navigation"
-              className="lg:hidden p-2 hover:bg-slate-800 rounded-xl transition-colors text-slate-400 hover:text-white shrink-0 touch-target"
-            >
-              <Menu size={20} />
-            </button>
-
-            <div className="hidden md:block text-sm text-slate-400 shrink-0">
-              {(() => {
-                const h = new Date().getHours();
-                const greeting = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
-                return `${greeting}, Avery`;
-              })()}
-            </div>
-
-            <div className="flex-1 min-w-0">
-              <div className="relative">
-                <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  placeholder='Ask anything…'
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && searchQuery.trim()) {
-                      setAIAnalystOpen(true);
-                    }
-                    if (e.key === 'Escape') {
-                      e.currentTarget.blur();
-                      setSearchQuery('');
-                    }
-                  }}
-                  className="w-full bg-slate-900 border border-slate-700 pl-9 sm:pl-11 pr-10 sm:pr-16 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl text-sm focus:outline-none focus:border-cyan-500 transition-colors"
-                />
-                {searchQuery.trim() ? (
-                  <kbd className="absolute right-3 top-1/2 -translate-y-1/2 px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-xs text-slate-500 font-mono pointer-events-none">
-                    ⏎
-                  </kbd>
-                ) : (
-                  <kbd className="absolute right-3 top-1/2 -translate-y-1/2 px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-[10px] text-slate-600 font-mono pointer-events-none hidden sm:flex items-center gap-0.5">
-                    ⌘K
-                  </kbd>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Right: workspace switcher (desktop) + bell + reset + avatar */}
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            <div className="hidden lg:flex">
-              <WorkspaceSwitcher />
-            </div>
-            <button
-              aria-label="Notifications"
-              className="p-2 hover:bg-slate-800 rounded-xl transition-colors touch-target"
-            >
-              <Bell size={18} />
-            </button>
-            <button
-              onClick={() => {
-                if (confirm('Clear all data and reset to defaults?')) {
-                  localStorage.removeItem('aether-storage-v1');
-                  window.location.reload();
-                }
-              }}
-              className="hidden sm:block text-xs text-slate-500 hover:text-slate-300 px-3 py-1.5 transition-colors"
-            >
-              Reset
-            </button>
-            <div className="w-8 h-8 bg-gradient-to-br from-cyan-400 to-emerald-400 rounded-full flex items-center justify-center text-black font-semibold cursor-pointer select-none text-xs">
-              AM
-            </div>
-          </div>
-        </div>
+        <CommandBar
+          onOpenSidebar={() => setSidebarOpen(true)}
+          onOpenShortcuts={() => setShortcutsOpen(true)}
+          onReset={() => {
+            if (confirm('Clear all data and reset to defaults?')) {
+              localStorage.removeItem('aether-storage-v1');
+              window.location.reload();
+            }
+          }}
+        />
 
         {/* Shared-view banner */}
         {shareToken && (
@@ -419,7 +364,7 @@ export default function AetherDashboard() {
           <div className="max-w-screen-2xl mx-auto">
 
             {currentView === 'dashboard' && (
-              <div className="aether-fade-up">
+              <div className="aether-view-enter">
                 {/* ── Dashboard header ── */}
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-6 sm:mb-8 gap-4">
                   <div>
@@ -441,39 +386,67 @@ export default function AetherDashboard() {
                     </div>
                   </div>
                   <div className="flex gap-2 flex-wrap sm:justify-end shrink-0">
-                    <button
-                      onClick={() => fileInputRef.current?.click()}
-                      className="flex items-center gap-2 px-3 sm:px-4 py-2 border border-dashed border-slate-700 hover:border-cyan-500/60 hover:bg-cyan-500/5 hover:text-cyan-300 text-slate-500 rounded-xl text-sm transition-all group press-scale"
-                      title="Import JSON — or drag & drop anywhere"
-                    >
-                      <Upload size={14} className="group-hover:text-cyan-400 transition-colors" />
-                      Import
-                    </button>
-                    <button
-                      onClick={() => { setPDFLinkedEntityId(undefined); setPDFUploadModalOpen(true); }}
-                      className="flex items-center gap-2 px-3 sm:px-4 py-2 border border-dashed border-slate-700 hover:border-rose-500/50 hover:bg-rose-500/5 hover:text-rose-300 text-slate-500 rounded-xl text-sm transition-all group press-scale"
-                      title="Upload & analyze a PDF document"
-                    >
-                      <FileText size={14} className="group-hover:text-rose-400 transition-colors" />
-                      PDF
-                    </button>
+                    <Tooltip content="Import JSON backup — or drag & drop anywhere" position="bottom">
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        className="flex items-center gap-2 px-3 sm:px-4 py-2 border border-dashed border-slate-700 hover:border-cyan-500/60 hover:bg-cyan-500/5 hover:text-cyan-300 text-slate-500 rounded-xl text-sm transition-all group press-scale"
+                      >
+                        <Upload size={14} className="group-hover:text-cyan-400 transition-colors" />
+                        Import
+                      </button>
+                    </Tooltip>
+                    <Tooltip content="Upload & extract entities from a PDF" position="bottom">
+                      <button
+                        onClick={() => { setPDFLinkedEntityId(undefined); setPDFUploadModalOpen(true); }}
+                        className="flex items-center gap-2 px-3 sm:px-4 py-2 border border-dashed border-slate-700 hover:border-rose-500/50 hover:bg-rose-500/5 hover:text-rose-300 text-slate-500 rounded-xl text-sm transition-all group press-scale"
+                      >
+                        <FileText size={14} className="group-hover:text-rose-400 transition-colors" />
+                        PDF
+                      </button>
+                    </Tooltip>
                     <div className="hidden sm:block w-px bg-slate-800 self-stretch mx-1" />
-                    <button onClick={() => exportAsJSON(data)} className="px-3 sm:px-4 py-2 border border-slate-800 hover:border-slate-600 rounded-xl text-sm text-slate-400 hover:text-slate-200 transition-all press-scale">JSON</button>
-                    <button onClick={() => exportAsCSV(data)} className="hidden sm:block px-4 py-2 border border-slate-800 hover:border-slate-600 rounded-xl text-sm text-slate-400 hover:text-slate-200 transition-all press-scale">CSV</button>
-                    <button onClick={exportGraphAsPNG} className="hidden sm:block px-4 py-2 border border-slate-800 hover:border-slate-600 rounded-xl text-sm text-slate-400 hover:text-slate-200 transition-all press-scale">PNG</button>
-                    <button
-                      onClick={() => setAIAnalystOpen(true)}
-                      className="btn-glow flex items-center gap-2 px-3 sm:px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-black rounded-xl text-sm font-semibold"
-                    >
-                      <Sparkles size={14} />
-                      Analyse
-                    </button>
+                    <Tooltip content="Export graph as JSON" position="bottom">
+                      <button onClick={() => exportAsJSON(data)} className="px-3 sm:px-4 py-2 border border-slate-800 hover:border-slate-600 rounded-xl text-sm text-slate-400 hover:text-slate-200 transition-all press-scale">JSON</button>
+                    </Tooltip>
+                    <Tooltip content="Export entities as CSV spreadsheet" position="bottom" className="hidden sm:inline-flex">
+                      <button onClick={() => exportAsCSV(data)} className="px-4 py-2 border border-slate-800 hover:border-slate-600 rounded-xl text-sm text-slate-400 hover:text-slate-200 transition-all press-scale">CSV</button>
+                    </Tooltip>
+                    <Tooltip content="Export graph as PNG image" position="bottom" className="hidden sm:inline-flex">
+                      <button onClick={exportGraphAsPNG} className="px-4 py-2 border border-slate-800 hover:border-slate-600 rounded-xl text-sm text-slate-400 hover:text-slate-200 transition-all press-scale">PNG</button>
+                    </Tooltip>
+                    <Tooltip content="Generate branded PDF report" position="bottom" className="hidden sm:inline-flex">
+                      <button
+                        onClick={() => { setReportFocusNodeId(undefined); setReportGeneratorOpen(true); }}
+                        className="flex items-center gap-2 px-4 py-2 border border-slate-700 hover:border-emerald-500/50 hover:bg-emerald-500/5 hover:text-emerald-300 text-slate-400 rounded-xl text-sm transition-all press-scale"
+                      >
+                        <BookOpen size={14} />
+                        Report
+                      </button>
+                    </Tooltip>
+                    <Tooltip content="Surprise me — generate a random smart insight" position="bottom">
+                      <button
+                        onClick={() => { const q = getRandomInsight(data); setSearchQuery(q); setAIAnalystOpen(true); }}
+                        className="surprise-btn flex items-center gap-2 px-3 sm:px-4 py-2 border border-emerald-500/30 hover:border-emerald-400/60 bg-emerald-500/8 hover:bg-emerald-500/15 text-emerald-400 hover:text-emerald-300 rounded-xl text-sm font-medium transition-all"
+                      >
+                        <Shuffle size={14} />
+                        <span className="hidden sm:inline">Surprise Me</span>
+                      </button>
+                    </Tooltip>
+                    <Tooltip content={<>Run AI analysis on your graph <TipKbd>⏎</TipKbd></>} position="bottom">
+                      <button
+                        onClick={() => setAIAnalystOpen(true)}
+                        className="btn-glow flex items-center gap-2 px-3 sm:px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-black rounded-xl text-sm font-semibold"
+                      >
+                        <Sparkles size={14} />
+                        Analyse
+                      </button>
+                    </Tooltip>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5">
                   {/* ── Graph card ── */}
-                  <div className="col-span-1 lg:col-span-8 aether-fade-up" style={{ animationDelay: '40ms' }}>
+                  <div className="col-span-1 lg:col-span-8 aether-fade-up" style={{ animationDelay: '60ms' }}>
                     <div className="glass rounded-2xl sm:rounded-3xl p-4 sm:p-7 border border-slate-800/80 h-full">
                       <div className="flex items-center justify-between mb-4 sm:mb-5">
                         <h2 className="text-base font-semibold flex items-center gap-2.5">
@@ -488,184 +461,14 @@ export default function AetherDashboard() {
                     </div>
                   </div>
 
-                  {/* ── Right column ── */}
-                  <div className="col-span-1 lg:col-span-4 flex flex-col gap-4 sm:gap-5">
-
-                    {/* Intelligence Feed */}
-                    {(() => {
-                      const autoInsights = generateAutoInsights(data);
-                      if (autoInsights.length === 0) return null;
-                      const severityStyle: Record<AutoInsight['severity'], { bg: string; border: string; hoverBorder: string; icon: React.ReactNode; label: string }> = {
-                        risk:        { bg: 'bg-rose-500/6',    border: 'border-rose-500/20',    hoverBorder: 'hover:border-rose-500/40',    icon: <ShieldAlert size={13} className="text-rose-400" />,   label: 'text-rose-300' },
-                        opportunity: { bg: 'bg-emerald-500/6', border: 'border-emerald-500/20', hoverBorder: 'hover:border-emerald-500/40', icon: <TrendingUp size={13} className="text-emerald-400" />, label: 'text-emerald-300' },
-                        info:        { bg: 'bg-cyan-500/6',    border: 'border-cyan-500/20',    hoverBorder: 'hover:border-cyan-500/40',    icon: <Zap size={13} className="text-cyan-400" />,           label: 'text-cyan-300' },
-                      };
-                      return (
-                        <div className="glass rounded-3xl p-5 border border-slate-800/80 aether-fade-up" style={{ animationDelay: '80ms' }}>
-                          <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-sm font-semibold flex items-center gap-2">
-                              <Sparkles size={13} className="text-cyan-400" />
-                              Intelligence Feed
-                            </h3>
-                            <span className="text-[10px] text-slate-600 font-mono bg-slate-800/60 border border-slate-700/60 rounded-full px-2 py-0.5">
-                              {autoInsights.length} signal{autoInsights.length !== 1 ? 's' : ''}
-                            </span>
-                          </div>
-                          <div className="space-y-2 aether-stagger">
-                            {autoInsights.map((insight) => {
-                              const style = severityStyle[insight.severity];
-                              return (
-                                <button
-                                  key={insight.id}
-                                  onClick={() => { setSearchQuery(insight.query); setAIAnalystOpen(true); }}
-                                  className={`w-full text-left p-3.5 rounded-2xl border ${style.bg} ${style.border} ${style.hoverBorder} hover:brightness-110 transition-all duration-150 group press-scale`}
-                                >
-                                  <div className="flex items-start gap-2.5">
-                                    <span className="shrink-0 mt-0.5">{style.icon}</span>
-                                    <div className="flex-1 min-w-0">
-                                      <p className={`text-xs font-semibold ${style.label} mb-0.5 leading-snug`}>{insight.title}</p>
-                                      <p className="text-[11px] text-slate-500 leading-snug line-clamp-2">{insight.description}</p>
-                                    </div>
-                                    <ChevronRight size={11} className="text-slate-700 group-hover:text-slate-400 shrink-0 mt-0.5 transition-colors group-hover:translate-x-0.5 duration-150" />
-                                  </div>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })()}
-
-                    {/* Projects card */}
-                    <div className="glass rounded-3xl p-5 border border-slate-800/80 aether-fade-up" style={{ animationDelay: '120ms' }}>
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-sm font-semibold flex items-center gap-2">
-                          <FolderOpen size={13} className="text-purple-400" />
-                          Active Projects
-                        </h3>
-                        <button
-                          onClick={() => setCurrentView('projects')}
-                          className="text-[11px] text-slate-600 hover:text-cyan-400 transition-colors flex items-center gap-1"
-                        >
-                          View all <ChevronRight size={11} />
-                        </button>
-                      </div>
-                      {data.nodes.filter(n => n.type === 'Project').length === 0 ? (
-                        <div className="py-7 flex flex-col items-center gap-3 text-center">
-                          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500/10 to-purple-500/5 border border-purple-500/15 flex items-center justify-center">
-                            <FolderOpen size={20} className="text-purple-500/50" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-slate-400">No projects yet</p>
-                            <p className="text-xs text-slate-600 mt-0.5">Track budgets, progress & team</p>
-                          </div>
-                          <button
-                            onClick={() => setNewEntityModalOpen(true)}
-                            className="text-xs text-cyan-500 hover:text-cyan-400 transition-colors flex items-center gap-1"
-                          >
-                            <Plus size={11} /> Add a project
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="space-y-2 aether-stagger">
-                          {data.nodes.filter(n => n.type === 'Project').slice(0, 4).map(project => {
-                            const progress = Number(project.properties.progress) || 0;
-                            const statusColor =
-                              project.properties.status === 'Active'   ? 'bg-emerald-400' :
-                              project.properties.status === 'At Risk'  ? 'bg-rose-400'    :
-                              project.properties.status === 'Complete' ? 'bg-slate-500'   :
-                              'bg-amber-400';
-                            return (
-                              <button
-                                key={project.id}
-                                onClick={() => setSelectedNode(project)}
-                                className="w-full text-left px-3.5 py-3 bg-slate-900/60 rounded-2xl border border-slate-800 hover:border-purple-500/30 hover:bg-slate-800/60 transition-all duration-150 group press-scale"
-                              >
-                                <div className="flex items-center gap-2 mb-1.5">
-                                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusColor}`} />
-                                  <span className="font-medium text-xs text-slate-200 group-hover:text-purple-300 transition-colors flex-1 truncate">{project.label}</span>
-                                  {project.properties.progress !== undefined && (
-                                    <span className="text-[10px] font-mono text-slate-500 tabular-nums">{progress}%</span>
-                                  )}
-                                </div>
-                                {project.properties.progress !== undefined && (
-                                  <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
-                                    <div
-                                      className={`h-full rounded-full transition-all duration-500 ${
-                                        progress >= 70 ? 'bg-emerald-400' : progress >= 35 ? 'bg-cyan-400' : 'bg-rose-400'
-                                      }`}
-                                      style={{ width: `${progress}%` }}
-                                    />
-                                  </div>
-                                )}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Metrics card */}
-                    <div className="glass rounded-3xl p-5 border border-slate-800/80 aether-fade-up" style={{ animationDelay: '160ms' }}>
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-sm font-semibold flex items-center gap-2">
-                          <BarChart3 size={13} className="text-amber-400" />
-                          Key Metrics
-                        </h3>
-                        <button
-                          onClick={() => setCurrentView('analytics')}
-                          className="text-[11px] text-slate-600 hover:text-cyan-400 transition-colors flex items-center gap-1"
-                        >
-                          Analytics <ChevronRight size={11} />
-                        </button>
-                      </div>
-                      {data.nodes.filter(n => n.type === 'Metric').length === 0 ? (
-                        <div className="py-7 flex flex-col items-center gap-3 text-center">
-                          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500/10 to-amber-500/5 border border-amber-500/15 flex items-center justify-center">
-                            <BarChart3 size={20} className="text-amber-500/50" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-slate-400">No metrics yet</p>
-                            <p className="text-xs text-slate-600 mt-0.5">Add KPIs to track over time</p>
-                          </div>
-                          <button
-                            onClick={() => setNewEntityModalOpen(true)}
-                            className="text-xs text-cyan-500 hover:text-cyan-400 transition-colors flex items-center gap-1"
-                          >
-                            <Plus size={11} /> Add a metric
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="divide-y divide-slate-800/60">
-                          {data.nodes.filter(n => n.type === 'Metric').slice(0, 3).map(metric => {
-                            const val = metric.properties.value;
-                            const unit = metric.properties.unit;
-                            const display = typeof val === 'number'
-                              ? unit === 'USD' || String(metric.label).toLowerCase().match(/revenue|cost|budget/)
-                                ? `$${(val / 1000).toFixed(1)}k`
-                                : unit === '%' ? `${val}%` : val.toLocaleString()
-                              : val ?? '—';
-                            return (
-                              <button
-                                key={metric.id}
-                                onClick={() => setSelectedNode(metric)}
-                                className="w-full flex items-center justify-between py-3 group"
-                              >
-                                <span className="text-xs text-slate-400 group-hover:text-slate-200 transition-colors truncate">{metric.label}</span>
-                                <span className="text-sm font-semibold text-emerald-400 font-mono tabular-nums ml-3 shrink-0">{display}</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  {/* ── Right column (draggable) ── */}
+                  <DraggableRightColumn />
                 </div>
               </div>
             )}
 
             {currentView === 'projects' && (
-              <div className={`flex flex-col ${projectsSubView === 'kanban' ? 'h-[calc(100vh-8rem)]' : ''}`}>
+              <div className={`aether-view-enter flex flex-col ${projectsSubView === 'kanban' ? 'h-[calc(100vh-8rem)]' : ''}`}>
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end mb-6 sm:mb-8 gap-4 shrink-0">
                   <div>
@@ -708,27 +511,25 @@ export default function AetherDashboard() {
 
                 {/* Empty state */}
                 {data.nodes.filter(n => n.type === 'Project').length === 0 && (
-                  <div className="glass rounded-3xl p-20 text-center aether-fade-up">
-                    <div className="w-16 h-16 rounded-2xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center mx-auto mb-6">
-                      <FolderOpen size={28} className="text-purple-500/60" />
-                    </div>
-                    <h3 className="text-2xl font-medium mb-3">No projects yet</h3>
-                    <p className="text-slate-400 max-w-sm mx-auto text-sm leading-relaxed mb-8">
-                      Create your first project entity to start tracking budgets, progress, and team connections.
-                    </p>
-                    <button
-                      onClick={() => setNewEntityModalOpen(true)}
-                      className="inline-flex items-center gap-2 px-6 py-3 bg-cyan-500 hover:bg-cyan-400 text-black rounded-2xl font-medium text-sm transition-colors"
-                    >
-                      <Plus size={16} />
-                      New Project
-                    </button>
+                  <div className="glass rounded-3xl">
+                    <EmptyState
+                      icon={FolderOpen}
+                      color="violet"
+                      title="No projects in the pipeline"
+                      description="Track initiatives from planning to completion — budgets, progress, risks, and team connections in one place."
+                      actions={[
+                        { label: 'Create Project', icon: Plus, onClick: () => setNewEntityModalOpen(true) },
+                        { label: 'Import Data', icon: Upload, onClick: () => fileInputRef.current?.click(), variant: 'secondary' },
+                      ]}
+                      hint="Tip: set a status of Planning, Active, or Complete to visualise in Kanban"
+                      size="lg"
+                    />
                   </div>
                 )}
 
                 {/* Grid view */}
                 {projectsSubView === 'grid' && data.nodes.filter(n => n.type === 'Project').length > 0 && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 aether-grid-stagger">
                     {data.nodes.filter(n => n.type === 'Project').map((project) => (
                       <div
                         key={project.id}
@@ -745,7 +546,7 @@ export default function AetherDashboard() {
                             project.properties.status === 'At Risk'  ? 'bg-rose-500/20 text-rose-400'      :
                                                                         'bg-slate-500/20 text-slate-400'
                           }`}>
-                            {project.properties.status ?? 'Planning'}
+                            {String(project.properties.status ?? 'Planning')}
                           </div>
                         </div>
                         <div className="space-y-4 text-sm">
@@ -757,17 +558,17 @@ export default function AetherDashboard() {
                             <div>
                               <div className="flex justify-between mb-1.5">
                                 <span className="text-slate-400">Progress</span>
-                                <span>{project.properties.progress}%</span>
+                                <span>{String(project.properties.progress)}%</span>
                               </div>
                               <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
-                                <div className="h-full bg-cyan-500 rounded-full transition-all" style={{ width: `${project.properties.progress}%` }} />
+                                <div className="h-full bg-cyan-500 rounded-full progress-fill" style={{ width: `${project.properties.progress}%` }} />
                               </div>
                             </div>
                           )}
-                          {project.properties.priority && (
+                          {!!project.properties.priority && (
                             <div className="flex justify-between">
                               <span className="text-slate-400">Priority</span>
-                              <span className="font-medium capitalize">{project.properties.priority}</span>
+                              <span className="font-medium capitalize">{String(project.properties.priority)}</span>
                             </div>
                           )}
                         </div>
@@ -791,7 +592,7 @@ export default function AetherDashboard() {
             )}
 
             {currentView === 'geospatial' && (
-              <div>
+              <div className="aether-view-enter">
                 <div className="flex justify-between items-end mb-8">
                   <div>
                     <h1 className="text-4xl font-semibold tracking-tighter">Geospatial Intelligence</h1>
@@ -815,7 +616,7 @@ export default function AetherDashboard() {
             )}
 
             {currentView === 'entities' && (
-              <div>
+              <div className="aether-view-enter">
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end mb-6 sm:mb-10 gap-4">
                   <div>
                     <h1 className="text-3xl sm:text-4xl font-semibold tracking-tighter">All Entities</h1>
@@ -830,21 +631,19 @@ export default function AetherDashboard() {
                 </div>
 
                 {data.nodes.length === 0 ? (
-                  <div className="glass rounded-3xl p-20 text-center aether-fade-up">
-                    <div className="w-16 h-16 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center mx-auto mb-6">
-                      <Users size={28} className="text-cyan-500/60" />
-                    </div>
-                    <h3 className="text-2xl font-medium mb-3">No entities yet</h3>
-                    <p className="text-slate-400 max-w-sm mx-auto text-sm leading-relaxed mb-8">
-                      Your ontology is empty. Add people, projects, locations, metrics, and more to start building your intelligence graph.
-                    </p>
-                    <button
-                      onClick={() => setNewEntityModalOpen(true)}
-                      className="inline-flex items-center gap-2 px-6 py-3 bg-cyan-500 hover:bg-cyan-400 text-black rounded-2xl font-medium text-sm transition-colors"
-                    >
-                      <Plus size={16} />
-                      New Entity
-                    </button>
+                  <div className="glass rounded-3xl">
+                    <EmptyState
+                      icon={Network}
+                      color="cyan"
+                      title="Your intelligence graph is empty"
+                      description="Add people, projects, locations, metrics, and more to start building your ontology."
+                      actions={[
+                        { label: 'New Entity', icon: Plus, onClick: () => setNewEntityModalOpen(true) },
+                        { label: 'Import JSON', icon: Upload, onClick: () => fileInputRef.current?.click(), variant: 'secondary' },
+                      ]}
+                      hint="Tip: drag & drop a JSON backup anywhere on the page to import instantly"
+                      size="lg"
+                    />
                   </div>
                 ) : (
                   <div className="glass rounded-3xl overflow-hidden">
@@ -857,7 +656,8 @@ export default function AetherDashboard() {
                           <th className="text-left p-6 font-medium text-slate-400">Created</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-800">
+
+                      <tbody className="divide-y divide-slate-800 table-stagger">
                         {data.nodes.map((node) => (
                           <tr
                             key={node.id}
@@ -890,7 +690,7 @@ export default function AetherDashboard() {
             )}
 
             {currentView === 'search' && (
-              <div>
+              <div className="aether-view-enter">
                 <div className="flex justify-between items-end mb-10">
                   <div>
                     <h1 className="text-4xl font-semibold tracking-tighter">Global Search</h1>
@@ -911,7 +711,7 @@ export default function AetherDashboard() {
                   </div>
 
                   {searchQuery.trim() && (
-                    <div className="space-y-3">
+                    <div className="space-y-3 aether-stagger">
                       {searchOntology(data, searchQuery).map((node) => (
                         <div
                           key={node.id}
@@ -932,29 +732,42 @@ export default function AetherDashboard() {
                       ))}
 
                       {searchOntology(data, searchQuery).length === 0 && (
-                        <div className="text-center py-14">
-                          <p className="text-slate-500 text-sm mb-1">No entities match</p>
-                          <p className="text-slate-300 font-medium">&ldquo;{searchQuery}&rdquo;</p>
-                          <p className="text-xs text-slate-600 mt-3">Try a broader term or check the AI Analyst for insights</p>
-                        </div>
+                        <EmptyState
+                          icon={SearchX}
+                          color="slate"
+                          title="No matches found"
+                          description={`Nothing in your ontology matches "${searchQuery}". Try a broader term, or let the AI Analyst dig deeper.`}
+                          actions={[
+                            { label: 'Ask AI Analyst', icon: Sparkles, onClick: () => setAIAnalystOpen(true) },
+                            { label: 'Clear search', onClick: () => setSearchQuery(''), variant: 'ghost' },
+                          ]}
+                          size="md"
+                        />
                       )}
                     </div>
                   )}
 
                   {!searchQuery.trim() && (
-                    <div className="py-16 text-center">
-                      <div className="w-14 h-14 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center mx-auto mb-5">
+                    <div className="py-12 text-center">
+                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-slate-700/20 to-slate-800/10 border border-slate-600/25 flex items-center justify-center mx-auto mb-4">
                         <Search size={22} className="text-slate-500" />
                       </div>
-                      <p className="text-slate-400 mb-6">Search across all entities, properties, and relationships</p>
+                      <p className="text-slate-300 font-medium mb-1">Search your intelligence graph</p>
+                      <p className="text-slate-600 text-sm mb-6">Entities, properties, relationships — all searchable</p>
                       <div className="flex flex-wrap gap-2 justify-center">
-                        {['financial overview', 'team status', 'active projects', 'risks', 'locations'].map((hint) => (
+                        {[
+                          { label: 'financial overview', icon: '💰' },
+                          { label: 'team status',        icon: '👥' },
+                          { label: 'active projects',    icon: '🚀' },
+                          { label: 'risks',              icon: '⚠️' },
+                          { label: 'locations',          icon: '📍' },
+                        ].map(({ label, icon }) => (
                           <button
-                            key={hint}
-                            onClick={() => setSearchQuery(hint)}
-                            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-600 rounded-full text-xs text-slate-400 hover:text-slate-200 transition-all"
+                            key={label}
+                            onClick={() => setSearchQuery(label)}
+                            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-800/60 hover:bg-slate-700/80 border border-slate-700 hover:border-slate-500 rounded-full text-xs text-slate-400 hover:text-slate-200 transition-all"
                           >
-                            {hint}
+                            <span>{icon}</span> {label}
                           </button>
                         ))}
                       </div>
@@ -1037,7 +850,7 @@ export default function AetherDashboard() {
                 search:      'bg-slate-500/10 text-slate-300 border-slate-500/30',
               };
               return (
-                <div>
+                <div className="aether-view-enter">
                   <div className="flex justify-between items-end mb-10">
                     <div>
                       <h1 className="text-4xl font-semibold tracking-tighter">Analytics & Insights</h1>
@@ -1045,22 +858,32 @@ export default function AetherDashboard() {
                         {insightNodes.length} saved analysis{insightNodes.length !== 1 ? 'es' : ''} · AI-generated intelligence
                       </p>
                     </div>
-                    <button
-                      onClick={() => setAIAnalystOpen(true)}
-                      className="flex items-center gap-2 px-5 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-black rounded-xl text-sm font-medium transition-colors"
-                    >
-                      <Sparkles size={16} />
-                      New Analysis
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => { setReportFocusNodeId(undefined); setReportGeneratorOpen(true); }}
+                        className="flex items-center gap-2 px-4 py-2.5 border border-slate-700 hover:border-emerald-500/50 hover:bg-emerald-500/5 hover:text-emerald-300 text-slate-400 rounded-xl text-sm transition-all"
+                        title="Export analytics as PDF"
+                      >
+                        <BookOpen size={14} />
+                        Export Report
+                      </button>
+                      <button
+                        onClick={() => setAIAnalystOpen(true)}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-black rounded-xl text-sm font-medium transition-colors"
+                      >
+                        <Sparkles size={16} />
+                        New Analysis
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 aether-grid-stagger">
                     {insightNodes.map((insight) => {
                       const intent = insight.properties.intent as string | undefined;
                       const confidence = insight.properties.confidence as string | undefined;
                       const keyFindings = insight.properties.keyFindings as string[] | undefined;
                       const recommendations = insight.properties.recommendations as string[] | undefined;
-                      const analyzedAt = insight.properties.analyzedAt || insight.createdAt;
+                      const analyzedAt = (insight.properties.analyzedAt as string | undefined) || insight.createdAt;
                       const intentColor = intent ? INTENT_COLORS[intent] : INTENT_COLORS.search;
 
                       return (
@@ -1091,7 +914,7 @@ export default function AetherDashboard() {
                           </h3>
 
                           <p className="text-slate-400 text-sm leading-relaxed">
-                            {insight.properties.summary}
+                            {insight.properties.summary as string}
                           </p>
 
                           {/* Key findings */}
@@ -1131,21 +954,18 @@ export default function AetherDashboard() {
                     })}
 
                     {insightNodes.length === 0 && (
-                      <div className="col-span-full glass rounded-3xl p-20 text-center">
-                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-500/10 to-emerald-500/10 border border-cyan-500/20 flex items-center justify-center mx-auto mb-6">
-                          <Sparkles className="text-cyan-600" size={28} />
-                        </div>
-                        <h3 className="text-2xl font-medium mb-3">No analyses yet</h3>
-                        <p className="text-slate-400 max-w-md mx-auto text-sm leading-relaxed mb-8">
-                          Use the command bar or the button above to run AI analyses. They'll appear here as rich insight cards.
-                        </p>
-                        <button
-                          onClick={() => setAIAnalystOpen(true)}
-                          className="inline-flex items-center gap-2 px-6 py-3 bg-cyan-500 hover:bg-cyan-400 text-black rounded-2xl font-medium text-sm transition-colors"
-                        >
-                          <Sparkles size={16} />
-                          Run First Analysis
-                        </button>
+                      <div className="col-span-full glass rounded-3xl">
+                        <EmptyState
+                          icon={Sparkles}
+                          color="cyan"
+                          title="No signals detected yet"
+                          description="Run an AI analysis from the command bar or the button above. Results appear here as structured insight cards with key findings and recommendations."
+                          actions={[
+                            { label: 'Run Analysis', icon: Sparkles, onClick: () => setAIAnalystOpen(true) },
+                          ]}
+                          hint='Try asking "What are the top risks?" or "Summarise financial health"'
+                          size="lg"
+                        />
                       </div>
                     )}
                   </div>
@@ -1159,6 +979,7 @@ export default function AetherDashboard() {
         <NodeDetailPanel />
         <SearchPanel />
         <AIInsightsPanel />
+        <ReportGenerator />
         <NewEntityModal
           isOpen={isNewEntityModalOpen}
           onClose={() => setNewEntityModalOpen(false)}

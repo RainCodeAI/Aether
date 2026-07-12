@@ -11,7 +11,10 @@ import CSVImportModal from './CSVImportModal';
 import EnrichModal from './EnrichModal';
 
 export default function DataView() {
-  const { data, snapshots, saveSnapshot, loadSnapshot, deleteSnapshot } = useAetherStore();
+  const {
+    data, snapshots, saveSnapshot, loadSnapshot, deleteSnapshot,
+    currentWorkspaceId, workspaces,
+  } = useAetherStore();
 
   const [snapName, setSnapName]         = useState('');
   const [confirmLoad, setConfirmLoad]   = useState<string | null>(null);
@@ -19,6 +22,12 @@ export default function DataView() {
   const [justSaved, setJustSaved]       = useState(false);
   const [csvOpen, setCsvOpen]           = useState(false);
   const [enrichOpen, setEnrichOpen]     = useState(false);
+
+  const workspaceName =
+    workspaces.find((w) => w.id === currentWorkspaceId)?.name ?? 'Workspace';
+  const workspaceSnapshots = snapshots.filter(
+    (s) => !s.workspaceId || s.workspaceId === currentWorkspaceId
+  );
 
   const handleSave = () => {
     saveSnapshot(snapName || `Snapshot — ${new Date().toLocaleString()}`);
@@ -94,7 +103,7 @@ export default function DataView() {
             <Database size={17} className="text-purple-400" />
           </div>
           <div>
-            <p className="text-sm font-medium text-slate-200">Current state</p>
+            <p className="text-sm font-medium text-slate-200">Current state · {workspaceName}</p>
             <p className="text-xs text-slate-500 font-mono">{data.nodes.length} nodes · {data.relationships.length} rels</p>
           </div>
         </div>
@@ -126,7 +135,9 @@ export default function DataView() {
             {justSaved ? <><Check size={14} /> Saved!</> : <><Save size={14} /> Save</>}
           </button>
         </div>
-        <p className="text-xs text-slate-600 mt-2">Snapshots are stored locally. Maximum 10 — oldest are removed automatically.</p>
+        <p className="text-xs text-slate-600 mt-2">
+          Snapshots are scoped to this workspace and stored locally. Maximum 20 overall — oldest are removed automatically.
+        </p>
       </div>
 
       {/* Snapshot history */}
@@ -134,18 +145,18 @@ export default function DataView() {
         <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
           <Clock size={13} />
           Snapshot History
-          <span className="font-mono normal-case text-slate-700 ml-1">{snapshots.length}/10</span>
+          <span className="font-mono normal-case text-slate-700 ml-1">{workspaceSnapshots.length}</span>
         </h3>
 
-        {snapshots.length === 0 ? (
+        {workspaceSnapshots.length === 0 ? (
           <div className="text-center py-10 rounded-2xl border border-dashed border-slate-800">
             <Clock size={28} className="mx-auto mb-2 text-slate-700" />
-            <p className="text-sm text-slate-600">No snapshots yet</p>
+            <p className="text-sm text-slate-600">No snapshots yet for {workspaceName}</p>
             <p className="text-xs text-slate-700 mt-1">Save a snapshot to create a restore point</p>
           </div>
         ) : (
           <div className="space-y-2">
-            {snapshots.map(snap => (
+            {workspaceSnapshots.map(snap => (
               <div
                 key={snap.id}
                 className="flex items-center gap-4 rounded-2xl border border-slate-800 bg-slate-900/40 px-4 py-3 hover:border-slate-700 transition-colors"

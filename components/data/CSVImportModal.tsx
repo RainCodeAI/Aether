@@ -39,11 +39,10 @@ interface Props {
 type Step = 'upload' | 'map' | 'preview';
 
 export default function CSVImportModal({ isOpen, onClose }: Props) {
-  const { data, setData } = useAetherStore();
+  const { data, setData, addNodes } = useAetherStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [step, setStep]             = useState<Step>('upload');
-  const [headers, setHeaders]       = useState<string[]>([]);
   const [rows, setRows]             = useState<string[][]>([]);
   const [mappings, setMappings]     = useState<ColumnMapping[]>([]);
   const [defaultType, setDefaultType] = useState<EntityType>('Document');
@@ -53,7 +52,6 @@ export default function CSVImportModal({ isOpen, onClose }: Props) {
 
   const reset = () => {
     setStep('upload');
-    setHeaders([]);
     setRows([]);
     setMappings([]);
     setParseError(null);
@@ -75,7 +73,6 @@ export default function CSVImportModal({ isOpen, onClose }: Props) {
         const { headers: h, rows: r } = parseCSV(text);
         const detected = detectColumnMappings(h, r);
         const suggested = suggestEntityType(r, detected);
-        setHeaders(h);
         setRows(r);
         setMappings(detected);
         setDefaultType(suggested);
@@ -101,7 +98,7 @@ export default function CSVImportModal({ isOpen, onClose }: Props) {
     if (mergeMode === 'append') {
       const existingIds = new Set(data.nodes.map(n => n.id));
       const newNodes = result.data.nodes.filter(n => !existingIds.has(n.id));
-      setData({ nodes: [...data.nodes, ...newNodes], relationships: data.relationships });
+      addNodes(newNodes);
       setImportResult({ nodeCount: newNodes.length, warnings: result.warnings });
     } else {
       setData(result.data);
@@ -250,7 +247,7 @@ Alice Chen,Person,,,`}
               {!hasLabel && (
                 <div className="flex items-start gap-2 text-amber-400 text-xs bg-amber-500/10 border border-amber-500/20 rounded-xl p-3">
                   <AlertTriangle size={13} className="shrink-0 mt-0.5" />
-                  Map at least one column to "Name / Label" — otherwise all rows will be skipped.
+                  Map at least one column to &ldquo;Name / Label&rdquo; — otherwise all rows will be skipped.
                 </div>
               )}
             </div>

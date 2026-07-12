@@ -4,9 +4,10 @@
 import React from 'react';
 import {
   Home, Search, Users, FolderOpen, Map, BarChart3, Clock, Plus,
-  Command, Table2, Columns2, Database, X, CalendarDays,
+  Command, Table2, Columns2, Database, X, CalendarDays, Keyboard,
 } from 'lucide-react';
 import { useAetherStore } from '@/lib/store';
+import Tooltip, { TipKbd } from '@/components/ui/Tooltip';
 
 type View = 'dashboard' | 'search' | 'entities' | 'projects' | 'geospatial' | 'analytics' | 'timeline' | 'table' | 'kanban' | 'data' | 'calendar';
 
@@ -15,31 +16,34 @@ interface MenuItem {
   label: string;
   view: View;
   section?: string;
+  /** Keyboard shortcut shown in the side tooltip, e.g. '⌘⇧G' */
+  shortcut?: string;
 }
 
 const MENU_ITEMS: MenuItem[] = [
-  { icon: Home,       label: 'Dashboard',  view: 'dashboard' },
-  { icon: Search,     label: 'Search',     view: 'search' },
-  { icon: Users,      label: 'Entities',   view: 'entities',   section: 'Data Views' },
-  { icon: Table2,     label: 'Table',      view: 'table' },
-  { icon: FolderOpen, label: 'Projects',   view: 'projects',   section: 'Workspace' },
-  { icon: Columns2,   label: 'Kanban',     view: 'kanban' },
-  { icon: Clock,      label: 'Timeline',   view: 'timeline' },
-  { icon: Map,        label: 'Geospatial', view: 'geospatial', section: 'Intelligence' },
-  { icon: BarChart3,  label: 'Analytics',  view: 'analytics' },
-  { icon: Database,     label: 'Data',     view: 'data',     section: 'Data' },
-  { icon: CalendarDays, label: 'Calendar', view: 'calendar' },
+  { icon: Home,         label: 'Dashboard',  view: 'dashboard', shortcut: '⌘⇧G' },
+  { icon: Search,       label: 'Search',     view: 'search' },
+  { icon: Users,        label: 'Entities',   view: 'entities',   section: 'Data Views' },
+  { icon: Table2,       label: 'Table',      view: 'table',      shortcut: '⌘⇧T' },
+  { icon: FolderOpen,   label: 'Projects',   view: 'projects',   section: 'Workspace' },
+  { icon: Columns2,     label: 'Kanban',     view: 'kanban',     shortcut: '⌘⇧K' },
+  { icon: Clock,        label: 'Timeline',   view: 'timeline',   shortcut: '⌘⇧L' },
+  { icon: Map,          label: 'Geospatial', view: 'geospatial', section: 'Intelligence' },
+  { icon: BarChart3,    label: 'Analytics',  view: 'analytics' },
+  { icon: Database,     label: 'Data',       view: 'data',       section: 'Data' },
+  { icon: CalendarDays, label: 'Calendar',   view: 'calendar' },
 ];
 
 // Subset shown in the mobile bottom nav
 const BOTTOM_NAV: View[] = ['dashboard', 'entities', 'projects', 'analytics', 'data'];
 
 interface SidebarProps {
-  isOpen: boolean;
-  onClose: () => void;
+  isOpen:          boolean;
+  onClose:         () => void;
+  onOpenShortcuts: () => void;
 }
 
-export default function Sidebar({ isOpen, onClose }: SidebarProps) {
+export default function Sidebar({ isOpen, onClose, onOpenShortcuts }: SidebarProps) {
   const {
     currentView, setCurrentView,
     searchQuery, setSearchQuery,
@@ -145,6 +149,47 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             const isActive = currentView === item.view;
             const count    = counts[item.view];
 
+            const navBtn = (
+              <button
+                onClick={() => navigate(item.view)}
+                aria-current={isActive ? 'page' : undefined}
+                className={`relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all duration-150 text-left group touch-target ${
+                  isActive
+                    ? 'bg-cyan-500/10 text-cyan-300 shadow-[inset_0_1px_0_rgba(34,211,238,0.1)]'
+                    : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+                }`}
+              >
+                {isActive && (
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-cyan-400 rounded-r-full shadow-[0_0_10px_rgba(34,211,238,0.9)]" />
+                )}
+                {!isActive && (
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-0 group-hover:h-4 bg-slate-600 rounded-r-full transition-all duration-200" />
+                )}
+
+                <item.icon
+                  size={16}
+                  className={`shrink-0 transition-all duration-150 ${
+                    isActive
+                      ? 'text-cyan-400 drop-shadow-[0_0_6px_rgba(34,211,238,0.8)]'
+                      : 'group-hover:text-slate-300'
+                  }`}
+                />
+                <span className={`font-medium text-sm flex-1 ${isActive ? 'text-cyan-200' : ''}`}>
+                  {item.label}
+                </span>
+
+                {count !== undefined && count > 0 && (
+                  <span className={`text-[10px] font-mono tabular-nums px-1.5 py-0.5 rounded-md transition-colors ${
+                    isActive
+                      ? 'bg-cyan-500/20 text-cyan-400'
+                      : 'bg-slate-800 text-slate-600 group-hover:bg-slate-700 group-hover:text-slate-400'
+                  }`}>
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+
             return (
               <React.Fragment key={item.view}>
                 {item.section && (
@@ -153,44 +198,17 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                   </p>
                 )}
 
-                <button
-                  onClick={() => navigate(item.view)}
-                  aria-current={isActive ? 'page' : undefined}
-                  className={`relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all duration-150 text-left group touch-target ${
-                    isActive
-                      ? 'bg-cyan-500/10 text-cyan-300 shadow-[inset_0_1px_0_rgba(34,211,238,0.1)]'
-                      : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
-                  }`}
-                >
-                  {isActive && (
-                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-cyan-400 rounded-r-full shadow-[0_0_10px_rgba(34,211,238,0.9)]" />
-                  )}
-                  {!isActive && (
-                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-0 group-hover:h-4 bg-slate-600 rounded-r-full transition-all duration-200" />
-                  )}
-
-                  <item.icon
-                    size={16}
-                    className={`shrink-0 transition-all duration-150 ${
-                      isActive
-                        ? 'text-cyan-400 drop-shadow-[0_0_6px_rgba(34,211,238,0.8)]'
-                        : 'group-hover:text-slate-300'
-                    }`}
-                  />
-                  <span className={`font-medium text-sm flex-1 ${isActive ? 'text-cyan-200' : ''}`}>
-                    {item.label}
-                  </span>
-
-                  {count !== undefined && count > 0 && (
-                    <span className={`text-[10px] font-mono tabular-nums px-1.5 py-0.5 rounded-md transition-colors ${
-                      isActive
-                        ? 'bg-cyan-500/20 text-cyan-400'
-                        : 'bg-slate-800 text-slate-600 group-hover:bg-slate-700 group-hover:text-slate-400'
-                    }`}>
-                      {count}
-                    </span>
-                  )}
-                </button>
+                {/* Wrap items that have keyboard shortcuts in a tooltip showing the hint */}
+                {item.shortcut ? (
+                  <Tooltip
+                    content={<>{item.label} <TipKbd>{item.shortcut}</TipKbd></>}
+                    position="right"
+                    delay={500}
+                    className="w-full"
+                  >
+                    {navBtn}
+                  </Tooltip>
+                ) : navBtn}
               </React.Fragment>
             );
           })}
@@ -198,23 +216,41 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
         {/* Bottom Actions */}
         <div className="p-4 border-t border-slate-800/80 space-y-2">
-          <button
-            onClick={() => { setNewEntityModalOpen(true); onClose(); }}
-            aria-label="Create new entity"
-            className="btn-glow w-full flex items-center justify-center gap-2 bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-400 hover:to-cyan-500 text-black font-semibold py-3 rounded-xl text-sm shadow-[0_0_20px_rgba(34,211,238,0.18)] active:scale-95"
+          <Tooltip
+            content={<>Add a new entity <TipKbd>⌘N</TipKbd></>}
+            position="top"
+            className="w-full"
           >
-            <Plus size={16} />
-            New Entity
-          </button>
+            <button
+              onClick={() => { setNewEntityModalOpen(true); onClose(); }}
+              aria-label="Create new entity"
+              className="btn-glow w-full flex items-center justify-center gap-2 bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-400 hover:to-cyan-500 text-black font-semibold py-3 rounded-xl text-sm shadow-[0_0_20px_rgba(34,211,238,0.18)] active:scale-95"
+            >
+              <Plus size={16} />
+              New Entity
+            </button>
+          </Tooltip>
 
-          <div className="flex items-center justify-center gap-3 pt-1">
-            <span className="text-[11px] text-slate-700 tabular-nums">
-              {data.nodes.length} entities
-            </span>
-            <span className="w-1 h-1 rounded-full bg-slate-700" />
-            <span className="text-[11px] text-slate-700 tabular-nums">
-              {data.relationships.length} links
-            </span>
+          <div className="flex items-center justify-between pt-1 px-0.5">
+            <div className="flex items-center gap-3">
+              <span className="text-[11px] text-slate-700 tabular-nums">
+                {data.nodes.length} entities
+              </span>
+              <span className="w-1 h-1 rounded-full bg-slate-700" />
+              <span className="text-[11px] text-slate-700 tabular-nums">
+                {data.relationships.length} links
+              </span>
+            </div>
+            <Tooltip content={<>Keyboard shortcuts <TipKbd>?</TipKbd></>} position="top">
+              <button
+                onClick={() => { onOpenShortcuts(); onClose(); }}
+                aria-label="Keyboard shortcuts"
+                className="flex items-center gap-1.5 text-[11px] text-slate-700 hover:text-slate-400 transition-colors group"
+              >
+                <Keyboard size={11} className="group-hover:text-slate-400 transition-colors" />
+                <kbd className="font-mono text-slate-700 group-hover:text-slate-500">?</kbd>
+              </button>
+            </Tooltip>
           </div>
         </div>
       </div>

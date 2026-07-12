@@ -130,7 +130,7 @@ export function csvRowsToNodes(
       ? (rawType as EntityType)
       : defaultType;
 
-    const properties: Record<string, any> = {};
+    const properties: Record<string, string | number> = {};
     mappings.forEach((m, colIdx) => {
       if (m.mappedTo === 'id' || m.mappedTo === 'label' || m.mappedTo === 'type' || m.mappedTo === 'skip') return;
       const val = row[colIdx];

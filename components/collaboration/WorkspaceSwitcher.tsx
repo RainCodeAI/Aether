@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Check, Plus, Users, X } from 'lucide-react';
 import { useAetherStore } from '@/lib/store';
+import { useSafeUser } from '@/lib/hooks/useSafeUser';
 
 export default function WorkspaceSwitcher() {
   const {
@@ -10,9 +11,13 @@ export default function WorkspaceSwitcher() {
     currentWorkspaceId,
     createWorkspace,
     switchWorkspace,
+    deleteWorkspace,
     addMemberToCurrentWorkspace,
+    workspaceData,
+    data,
   } = useAetherStore();
 
+  const { user } = useSafeUser();
   const [open, setOpen] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
   const [showNewWs, setShowNewWs] = useState(false);
@@ -22,6 +27,11 @@ export default function WorkspaceSwitcher() {
   const ref = useRef<HTMLDivElement>(null);
 
   const current = workspaces.find((w) => w.id === currentWorkspaceId) ?? workspaces[0];
+
+  const entityCount = (wsId: string) => {
+    if (wsId === currentWorkspaceId) return data.nodes.length;
+    return workspaceData[wsId]?.nodes.length ?? 0;
+  };
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -83,32 +93,52 @@ export default function WorkspaceSwitcher() {
               Workspaces
             </p>
             {workspaces.map((ws) => (
-              <button
+              <div
                 key={ws.id}
-                onClick={() => { switchWorkspace(ws.id); setOpen(false); }}
-                className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-all ${
+                className={`group flex items-center gap-1 rounded-xl transition-all ${
                   ws.id === currentWorkspaceId
                     ? 'bg-cyan-500/10 text-cyan-300'
                     : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'
                 }`}
               >
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-cyan-500/15 to-emerald-500/15 border border-cyan-500/20 flex items-center justify-center shrink-0">
-                  <span className="text-[11px] font-bold text-cyan-400 leading-none">
-                    {ws.name[0].toUpperCase()}
-                  </span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{ws.name}</p>
-                  <p className="text-[10px] text-slate-600 truncate">
-                    {ws.members.length === 0
-                      ? 'Private'
-                      : `${ws.members.length} member${ws.members.length !== 1 ? 's' : ''}`}
-                  </p>
-                </div>
-                {ws.id === currentWorkspaceId && (
-                  <Check size={13} className="text-cyan-400 shrink-0" />
+                <button
+                  type="button"
+                  onClick={() => { switchWorkspace(ws.id); setOpen(false); }}
+                  className="flex-1 flex items-center gap-2.5 px-3 py-2.5 text-left min-w-0"
+                >
+                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-cyan-500/15 to-emerald-500/15 border border-cyan-500/20 flex items-center justify-center shrink-0">
+                    <span className="text-[11px] font-bold text-cyan-400 leading-none">
+                      {ws.name[0].toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{ws.name}</p>
+                    <p className="text-[10px] text-slate-600 truncate">
+                      {entityCount(ws.id)} entit{entityCount(ws.id) === 1 ? 'y' : 'ies'}
+                      {ws.members.length > 0
+                        ? ` · ${ws.members.length} member${ws.members.length !== 1 ? 's' : ''}`
+                        : ' · Private'}
+                    </p>
+                  </div>
+                  {ws.id === currentWorkspaceId && (
+                    <Check size={13} className="text-cyan-400 shrink-0" />
+                  )}
+                </button>
+                {workspaces.length > 1 && (
+                  <button
+                    type="button"
+                    title="Delete workspace"
+                    onClick={() => {
+                      if (confirm(`Delete workspace “${ws.name}”? Its graph data will be removed.`)) {
+                        deleteWorkspace(ws.id);
+                      }
+                    }}
+                    className="mr-2 p-1.5 rounded-lg text-slate-700 hover:text-rose-400 hover:bg-rose-500/10 opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                  >
+                    <X size={12} />
+                  </button>
                 )}
-              </button>
+              </div>
             ))}
           </div>
 
@@ -164,6 +194,21 @@ export default function WorkspaceSwitcher() {
               Invite member
             </button>
           </div>
+
+          {/* Signed-in user */}
+          {user && (
+            <div className="border-t border-slate-800/80 px-4 py-2.5 flex items-center gap-2.5">
+              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-cyan-400/80 to-emerald-400/80 flex items-center justify-center text-black font-bold text-[10px] shrink-0 select-none">
+                {(user.firstName?.[0] ?? user.emailAddresses?.[0]?.emailAddress?.[0] ?? '?').toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-slate-300 truncate">
+                  {user.fullName ?? user.emailAddresses?.[0]?.emailAddress ?? ''}
+                </p>
+                <p className="text-[10px] text-slate-600">Signed in</p>
+              </div>
+            </div>
+          )}
 
           {/* Invite form */}
           {showInvite && (

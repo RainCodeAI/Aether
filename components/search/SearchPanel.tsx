@@ -19,7 +19,7 @@ export default function SearchPanel() {
         <div className="p-6 border-b border-slate-700 flex items-center justify-between">
           <div>
             <h2 className="text-xl font-semibold">Search Results</h2>
-            <p className="text-sm text-slate-400">{results.length} matches for "{searchQuery}"</p>
+            <p className="text-sm text-slate-400">{results.length} matches for &ldquo;{searchQuery}&rdquo;</p>
           </div>
           <button onClick={() => setSearchQuery('')} className="p-2 hover:bg-slate-800 rounded-xl">
             <X size={24} />

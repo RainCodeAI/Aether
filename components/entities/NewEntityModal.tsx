@@ -87,8 +87,8 @@ const SCHEMA: Record<EntityType, FieldDef[]> = {
   ],
 };
 
-function getDefaultValues(type: EntityType): Record<string, any> {
-  const out: Record<string, any> = {};
+function getDefaultValues(type: EntityType): Record<string, string | number> {
+  const out: Record<string, string | number> = {};
   SCHEMA[type].forEach((f) => {
     if (f.kind === 'select')   out[f.key] = f.options![0];
     else if (f.kind === 'number') out[f.key] = 0;
@@ -117,7 +117,7 @@ interface PendingConn {
 function FieldInput({
   field, value, onChange, hasError,
 }: {
-  field: FieldDef; value: any; onChange: (v: any) => void; hasError?: boolean;
+  field: FieldDef; value: string | number; onChange: (v: string | number) => void; hasError?: boolean;
 }) {
   const base = `w-full bg-slate-900/80 border rounded-xl px-3 py-2.5 text-sm outline-none transition-colors ${
     hasError
@@ -225,7 +225,7 @@ function PreviewCard({
 }: {
   type:        EntityType;
   label:       string;
-  schemaProps: Record<string, any>;
+  schemaProps: Record<string, string | number>;
   customProps: Array<{ key: string; value: string }>;
   connections: PendingConn[];
   allNodes:    OntologyNode[];
@@ -324,12 +324,12 @@ export default function NewEntityModal({
 }: {
   isOpen: boolean; onClose: () => void;
 }) {
-  const { data, setData } = useAetherStore();
+  const { data, addNode, addRelationships } = useAetherStore();
 
   // ── Form state ──────────────────────────────────────────────────────────────
   const [type,        setType]       = useState<EntityType>('Project');
   const [label,       setLabel]      = useState('');
-  const [schemaProps, setSchemaProps] = useState<Record<string, any>>(getDefaultValues('Project'));
+  const [schemaProps, setSchemaProps] = useState<Record<string, string | number>>(getDefaultValues('Project'));
   const [customProps, setCustomProps] = useState<Array<{ key: string; value: string }>>([]);
   const [connections, setConnections] = useState<PendingConn[]>([]);
 
@@ -340,18 +340,22 @@ export default function NewEntityModal({
   const [errors,  setErrors]  = useState<Record<string, string>>({});
   const [status,  setStatus]  = useState<'idle' | 'success'>('idle');
 
-  // Reset when modal opens
-  useEffect(() => {
-    if (!isOpen) return;
-    setType('Project');
-    setLabel('');
-    setSchemaProps(getDefaultValues('Project'));
-    setCustomProps([]);
-    setConnections([]);
-    setConnSearch('');
-    setErrors({});
-    setStatus('idle');
-  }, [isOpen]);
+  // Reset the form each time the modal opens (render-phase pattern, avoids a
+  // cascading setState-in-effect).
+  const [wasOpen, setWasOpen] = useState(isOpen);
+  if (isOpen !== wasOpen) {
+    setWasOpen(isOpen);
+    if (isOpen) {
+      setType('Project');
+      setLabel('');
+      setSchemaProps(getDefaultValues('Project'));
+      setCustomProps([]);
+      setConnections([]);
+      setConnSearch('');
+      setErrors({});
+      setStatus('idle');
+    }
+  }
 
   // Escape to close
   useEffect(() => {
@@ -371,7 +375,7 @@ export default function NewEntityModal({
     setErrors({});
   };
 
-  const updateSchemaProp = (key: string, value: any) => {
+  const updateSchemaProp = (key: string, value: string | number) => {
     setSchemaProps((prev) => ({ ...prev, [key]: value }));
     setErrors((prev) => { const next = { ...prev }; delete next[key]; return next; });
   };
@@ -421,8 +425,8 @@ export default function NewEntityModal({
 
   // ── Build final properties ────────────────────────────────────────────────────
 
-  const buildProperties = (): Record<string, any> => {
-    const props: Record<string, any> = { ...schemaProps };
+  const buildProperties = (): Record<string, unknown> => {
+    const props: Record<string, unknown> = { ...schemaProps };
 
     // Location: flatten lat/lng into a coordinates object (matching existing data shape)
     if (type === 'Location') {
@@ -462,10 +466,8 @@ export default function NewEntityModal({
       type: c.relType,
     }));
 
-    setData({
-      nodes:         [...data.nodes, newNode],
-      relationships: [...data.relationships, ...newRels],
-    });
+    addNode(newNode);
+    if (newRels.length > 0) addRelationships(newRels);
 
     setStatus('success');
     setTimeout(() => { setStatus('idle'); onClose(); }, 1300);
@@ -635,11 +637,11 @@ export default function NewEntityModal({
           {/* Footer / Create button */}
           <div className="px-5 sm:px-8 py-4 sm:py-5 border-t border-slate-800 shrink-0">
             {status === 'success' ? (
-              <div className="flex items-center justify-center gap-2.5 py-3.5 text-emerald-400 animate-pulse">
-                <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                  <Check size={14} className="text-emerald-400" />
+              <div className="flex items-center justify-center gap-2.5 py-3.5 text-emerald-400 aether-success-pop">
+                <div className="w-7 h-7 rounded-full bg-emerald-500/25 border border-emerald-500/40 flex items-center justify-center aether-scale-in">
+                  <Check size={15} className="text-emerald-300" />
                 </div>
-                <span className="font-semibold">
+                <span className="font-semibold text-emerald-300">
                   {type} created{connections.length > 0 ? ` with ${connections.length} connection${connections.length !== 1 ? 's' : ''}` : ''}!
                 </span>
               </div>

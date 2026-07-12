@@ -10,7 +10,7 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import 'leaflet-defaulticon-compatibility';
 
-delete (L.Icon.Default.prototype as any)._getIconUrl;
+delete (L.Icon.Default.prototype as { _getIconUrl?: unknown })._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
@@ -58,7 +58,7 @@ export default function AetherMapClient() {
         />
 
         {filteredLocations.map((location) => {
-          const coords = location.properties.coordinates;
+          const coords = location.properties.coordinates as { lat?: number; lng?: number } | undefined;
           if (!coords?.lat || !coords?.lng) return null;
 
           return (
@@ -71,7 +71,7 @@ export default function AetherMapClient() {
                 <div className="text-slate-900 min-w-[220px]">
                   <h3 className="font-semibold text-lg">{location.label}</h3>
                   <p className="text-sm text-slate-600">
-                    {location.properties.city}, {location.properties.province}
+                    {location.properties.city as string}, {location.properties.province as string}
                   </p>
 
                   <div className="mt-4 pt-3 border-t border-slate-200">

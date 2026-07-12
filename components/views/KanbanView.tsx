@@ -4,7 +4,7 @@
 import { useState, useCallback } from 'react';
 import {
   Plus, GripVertical, AlertTriangle, TrendingUp,
-  DollarSign, Users, ChevronRight,
+  DollarSign, Users, ChevronRight, CheckCircle2, Clock3, ShieldAlert, Layers,
 } from 'lucide-react';
 import { useAetherStore } from '@/lib/store';
 import { OntologyNode } from '@/types';
@@ -146,8 +146,8 @@ function KanbanCard({ node, lead, isAtRisk, isDragging, colAccent, colText, onDr
           <h4 className={`text-sm font-semibold text-slate-200 leading-snug transition-colors truncate group-hover:${colText}`}>
             {node.label}
           </h4>
-          {node.properties.description && (
-            <p className="text-[11px] text-slate-600 mt-0.5 line-clamp-1 leading-snug">{node.properties.description}</p>
+          {!!node.properties.description && (
+            <p className="text-[11px] text-slate-600 mt-0.5 line-clamp-1 leading-snug">{node.properties.description as string}</p>
           )}
         </div>
       </div>
@@ -185,13 +185,13 @@ function KanbanCard({ node, lead, isAtRisk, isDragging, colAccent, colText, onDr
             <span className="truncate max-w-[72px]">{lead}</span>
           </div>
         )}
-        {node.properties.priority && (
+        {!!node.properties.priority && (
           <span className={`ml-auto text-[10px] font-medium px-1.5 py-0.5 rounded-md ${
             node.properties.priority === 'high'   || node.properties.priority === 'Critical' ? 'bg-rose-500/15 text-rose-400' :
             node.properties.priority === 'medium' || node.properties.priority === 'Medium'   ? 'bg-amber-500/15 text-amber-400' :
                                                                                                'bg-slate-500/15 text-slate-400'
           }`}>
-            {node.properties.priority}
+            {node.properties.priority as string}
           </span>
         )}
       </div>
@@ -202,7 +202,7 @@ function KanbanCard({ node, lead, isAtRisk, isDragging, colAccent, colText, onDr
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function KanbanView() {
-  const { data, setData, setSelectedNode, setNewEntityModalOpen } = useAetherStore();
+  const { data, updateNode, setSelectedNode, setNewEntityModalOpen } = useAetherStore();
 
   const [draggingId,  setDraggingId]  = useState<string | null>(null);
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
@@ -229,15 +229,13 @@ export default function KanbanView() {
   const handleDrop = useCallback((e: React.DragEvent, colId: string) => {
     e.preventDefault();
     if (!draggingId) return;
-    setData({
-      nodes: data.nodes.map(n =>
-        n.id === draggingId ? { ...n, properties: { ...n.properties, status: colId } } : n
-      ),
-      relationships: data.relationships,
-    });
+    updateNode(draggingId, (n) => ({
+      ...n,
+      properties: { ...n.properties, status: colId },
+    }));
     setDraggingId(null);
     setDragOverCol(null);
-  }, [draggingId, data, setData]);
+  }, [draggingId, updateNode]);
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
     if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverCol(null);
@@ -246,7 +244,7 @@ export default function KanbanView() {
   return (
     <div className="flex gap-3 sm:gap-4 h-full overflow-x-auto pb-2 scroll-touch">
       {COLUMNS.map((col, colIdx) => {
-        const cards  = projects.filter(p => getColId(p.properties.status) === col.id);
+        const cards  = projects.filter(p => getColId(p.properties.status as string | undefined) === col.id);
         const isOver = dragOverCol === col.id && !!draggingId;
 
         return (
@@ -286,20 +284,35 @@ export default function KanbanView() {
                   : 'border-transparent'
               }`}
             >
-              {cards.length === 0 && !isOver && (
-                <div className="h-full flex flex-col items-center justify-center py-10 text-center">
-                  <div className={`w-9 h-9 rounded-xl border flex items-center justify-center mb-2.5 opacity-30 ${col.headerBg}`}>
-                    <TrendingUp size={14} className={col.text} />
+              {cards.length === 0 && !isOver && (() => {
+                const colMeta: Record<string, { icon: React.ElementType; title: string; sub: string }> = {
+                  Planning:  { icon: Clock3,       title: 'Nothing planned',   sub: 'Kick off a new initiative'   },
+                  Active:    { icon: TrendingUp,   title: 'All quiet here',    sub: 'Move a project to active'    },
+                  'At Risk': { icon: ShieldAlert,  title: 'No at-risk items',  sub: 'Great — keep it that way'    },
+                  Complete:  { icon: CheckCircle2, title: 'Nothing finished',  sub: 'Complete a project to see it here' },
+                };
+                const meta = colMeta[col.id] ?? { icon: Layers, title: 'No projects', sub: 'Add one to get started' };
+                const ColIcon = meta.icon;
+                return (
+                  <div className="h-full flex flex-col items-center justify-center py-10 text-center gap-2.5 px-4">
+                    <div className={`w-10 h-10 rounded-2xl border flex items-center justify-center opacity-40 ${col.headerBg}`}>
+                      <ColIcon size={15} className={col.text} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-slate-600">{meta.title}</p>
+                      <p className="text-[11px] text-slate-700 mt-0.5 leading-snug">{meta.sub}</p>
+                    </div>
+                    {col.id !== 'At Risk' && (
+                      <button
+                        onClick={() => setNewEntityModalOpen(true)}
+                        className={`text-[11px] ${col.text} opacity-50 hover:opacity-100 transition-opacity flex items-center gap-1`}
+                      >
+                        <Plus size={10} /> Add project
+                      </button>
+                    )}
                   </div>
-                  <p className="text-xs text-slate-700 mb-1.5">No projects</p>
-                  <button
-                    onClick={() => setNewEntityModalOpen(true)}
-                    className={`text-xs hover:text-slate-400 transition-colors text-slate-700`}
-                  >
-                    + Add one
-                  </button>
-                </div>
-              )}
+                );
+              })()}
 
               {isOver && (
                 <div className={`rounded-xl border-2 border-dashed h-16 flex items-center justify-center text-xs opacity-50 ${col.text} border-current`}>

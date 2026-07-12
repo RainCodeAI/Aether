@@ -46,7 +46,7 @@ interface PDFUploadModalProps {
 export default function PDFUploadModal({
   isOpen, onClose, linkedEntityId,
 }: PDFUploadModalProps) {
-  const { data, setData } = useAetherStore();
+  const { data, addNodes, addRelationships } = useAetherStore();
 
   const [step,          setStep]         = useState<Step>('upload');
   const [isDragOver,    setIsDragOver]   = useState(false);
@@ -156,10 +156,8 @@ export default function PDFUploadModal({
       });
     }
 
-    setData({
-      nodes:         [...data.nodes, docNode, ...entityNodes],
-      relationships: [...data.relationships, ...newRels],
-    });
+    addNodes([docNode, ...entityNodes]);
+    if (newRels.length > 0) addRelationships(newRels);
 
     setCreatedCount(1 + entityNodes.length);
     setStep('done');
@@ -380,7 +378,7 @@ export default function PDFUploadModal({
                             if (alreadyExists) return;
                             setSelected((prev) => {
                               const next = new Set(prev);
-                              next.has(entity.id) ? next.delete(entity.id) : next.add(entity.id);
+                              if (next.has(entity.id)) { next.delete(entity.id); } else { next.add(entity.id); }
                               return next;
                             });
                           }}

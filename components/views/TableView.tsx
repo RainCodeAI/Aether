@@ -4,9 +4,10 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   Search, ArrowUp, ArrowDown, ArrowUpDown, Trash2, Download,
-  Columns3, CheckSquare2, Square, MinusSquare, X, ChevronLeft,
-  ChevronRight as ChevronRightIcon, Filter,
+  Columns3, CheckSquare2, Square, X, ChevronLeft,
+  ChevronRight as ChevronRightIcon, Filter, SearchX, Database, Plus,
 } from 'lucide-react';
+import EmptyState from '@/components/ui/EmptyState';
 import { useAetherStore } from '@/lib/store';
 import { OntologyNode, EntityType } from '@/types';
 
@@ -106,7 +107,7 @@ interface TableViewProps {
 }
 
 export default function TableView({ typeFilter, compact = false }: TableViewProps) {
-  const { data, setData, setSelectedNode } = useAetherStore();
+  const { data, removeNodes, setSelectedNode, setNewEntityModalOpen } = useAetherStore();
 
   const [search,       setSearch]       = useState('');
   const [activeType,   setActiveType]   = useState<EntityType | 'All'>(typeFilter ?? 'All');
@@ -119,13 +120,21 @@ export default function TableView({ typeFilter, compact = false }: TableViewProp
   const [page,         setPage]         = useState(0);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
 
-  // Sync activeType when typeFilter prop changes (e.g. embedded use)
-  useEffect(() => {
+  // Sync activeType when the typeFilter prop changes (e.g. embedded use), via the
+  // render-phase pattern to avoid a cascading setState-in-effect.
+  const [prevTypeFilter, setPrevTypeFilter] = useState(typeFilter);
+  if (typeFilter !== prevTypeFilter) {
+    setPrevTypeFilter(typeFilter);
     if (typeFilter) setActiveType(typeFilter);
-  }, [typeFilter]);
+  }
 
-  // Reset page when filters change
-  useEffect(() => { setPage(0); }, [search, activeType, activeTag]);
+  // Reset pagination whenever the active filters change (render-phase pattern).
+  const filterKey = `${search} ${activeType} ${activeTag}`;
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (filterKey !== prevFilterKey) {
+    setPrevFilterKey(filterKey);
+    setPage(0);
+  }
 
   // Collect all tags across visible nodes
   const allTags = useMemo(() => {
@@ -179,7 +188,7 @@ export default function TableView({ typeFilter, compact = false }: TableViewProp
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) { next.delete(id); } else { next.add(id); }
       return next;
     });
   }, []);
@@ -215,10 +224,7 @@ export default function TableView({ typeFilter, compact = false }: TableViewProp
   // ── Bulk actions ───────────────────────────────────────────────────────────
 
   const handleBulkDelete = () => {
-    setData({
-      nodes: data.nodes.filter(n => !selectedIds.has(n.id)),
-      relationships: data.relationships.filter(r => !selectedIds.has(r.from) && !selectedIds.has(r.to)),
-    });
+    removeNodes([...selectedIds]);
     setSelectedIds(new Set());
     setDeleteConfirm(false);
   };
@@ -254,7 +260,7 @@ export default function TableView({ typeFilter, compact = false }: TableViewProp
     if (key === 'label' || key === 'type') return;
     setVisibleCols(prev => {
       const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
+      if (next.has(key)) { next.delete(key); } else { next.add(key); }
       return next;
     });
   };
@@ -428,18 +434,34 @@ export default function TableView({ typeFilter, compact = false }: TableViewProp
       {/* ── Table ── */}
       <div className="glass rounded-3xl overflow-hidden flex-1 flex flex-col min-h-0">
         {sorted.length === 0 ? (
-          <div className="flex-1 flex flex-col items-center justify-center py-20 text-center aether-fade-up">
-            <div className="w-16 h-16 rounded-2xl bg-slate-800/60 border border-slate-700/60 flex items-center justify-center mb-4">
-              <Filter size={22} className="text-slate-600" />
-            </div>
-            <p className="text-sm font-medium text-slate-400 mb-1">No entities match</p>
-            <p className="text-xs text-slate-600">Try adjusting your search or filters</p>
-            <button
-              onClick={() => { setSearch(''); setActiveType(typeFilter ?? 'All'); setActiveTag(null); }}
-              className="mt-4 text-xs text-cyan-500 hover:text-cyan-400 transition-colors underline underline-offset-2"
-            >
-              Clear all filters
-            </button>
+          <div className="flex-1 flex flex-col min-h-0">
+            {data.nodes.length === 0 ? (
+              <EmptyState
+                icon={Database}
+                color="cyan"
+                title="No entities to display"
+                description="Your ontology is empty. Add entities first to populate this table."
+                actions={[
+                  { label: 'New Entity', icon: Plus, onClick: () => setNewEntityModalOpen(true) },
+                ]}
+                size="md"
+              />
+            ) : (
+              <EmptyState
+                icon={SearchX}
+                color="slate"
+                title="No results match"
+                description="Try adjusting your search term, type filter, or tag to find what you're looking for."
+                actions={[
+                  {
+                    label: 'Clear filters',
+                    onClick: () => { setSearch(''); setActiveType(typeFilter ?? 'All'); setActiveTag(null); },
+                    variant: 'secondary',
+                  },
+                ]}
+                size="md"
+              />
+            )}
           </div>
         ) : (
           <>
@@ -541,7 +563,7 @@ export default function TableView({ typeFilter, compact = false }: TableViewProp
                                   node.properties.status === 'At Risk'  ? 'bg-rose-500/12 text-rose-400'      :
                                   'bg-slate-500/12 text-slate-400'
                                 }`}>
-                                  {node.properties.status}
+                                  {node.properties.status as string}
                                 </span>
                               ) : <span className="text-slate-700">—</span>}
                             </span>

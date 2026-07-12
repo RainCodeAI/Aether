@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   X, Calendar, Lightbulb, GitBranch, ArrowRight, ExternalLink,
-  Tag, Plus, Hash, Share2, CheckCircle2, FileText,
+  Tag, Plus, Hash, Share2, CheckCircle2, FileText, BookOpen,
 } from 'lucide-react';
 import { useAetherStore } from '@/lib/store';
 import { EntityType } from '@/types';
@@ -51,7 +51,7 @@ function SectionLabel({ children, count }: { children: React.ReactNode; count?: 
 // ─── Tag editor ────────────────────────────────────────────────────────────────
 
 function TagEditor({ nodeId }: { nodeId: string }) {
-  const { data, setData } = useAetherStore();
+  const { data, updateNode } = useAetherStore();
   const [input, setInput] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const tags = data.nodes.find(n => n.id === nodeId)?.tags ?? [];
@@ -59,18 +59,12 @@ function TagEditor({ nodeId }: { nodeId: string }) {
   const addTag = (tag: string) => {
     const clean = tag.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
     if (!clean || tags.includes(clean)) { setInput(''); return; }
-    const updated = data.nodes.map(n =>
-      n.id === nodeId ? { ...n, tags: [...(n.tags ?? []), clean] } : n
-    );
-    setData({ ...data, nodes: updated });
+    updateNode(nodeId, { tags: [...tags, clean] });
     setInput('');
   };
 
   const removeTag = (tag: string) => {
-    const updated = data.nodes.map(n =>
-      n.id === nodeId ? { ...n, tags: (n.tags ?? []).filter(t => t !== tag) } : n
-    );
-    setData({ ...data, nodes: updated });
+    updateNode(nodeId, { tags: tags.filter(t => t !== tag) });
   };
 
   return (
@@ -127,13 +121,18 @@ export default function NodeDetailPanel() {
     selectedNode, setSelectedNode, data, setSearchQuery, setAIAnalystOpen,
     currentWorkspaceId, addSharedNodeToCurrentWorkspace,
     setPDFUploadModalOpen, setPDFLinkedEntityId,
+    setReportGeneratorOpen, setReportFocusNodeId,
   } = useAetherStore();
   const [connectOpen, setConnectOpen] = useState(false);
   const [shareState, setShareState] = useState<'idle' | 'done'>('idle');
 
-  useEffect(() => {
+  // Reset the "Copied!" share feedback when a different node is selected
+  // (render-phase pattern, avoids a cascading setState-in-effect).
+  const [prevNodeId, setPrevNodeId] = useState(selectedNode?.id);
+  if (selectedNode?.id !== prevNodeId) {
+    setPrevNodeId(selectedNode?.id);
     setShareState('idle');
-  }, [selectedNode?.id]);
+  }
 
   useEffect(() => {
     if (!selectedNode) return;
@@ -351,6 +350,18 @@ export default function NodeDetailPanel() {
               Analyse
             </button>
           </div>
+
+          <button
+            onClick={() => {
+              setReportFocusNodeId(selectedNode.id);
+              setReportGeneratorOpen(true);
+            }}
+            className="w-full py-2.5 rounded-2xl border border-slate-700/80 hover:border-emerald-500/40 hover:bg-emerald-500/5 hover:text-emerald-300 text-slate-500 transition-all flex items-center justify-center gap-2 text-sm group press-scale"
+            aria-label="Export entity report as PDF"
+          >
+            <BookOpen size={14} className="group-hover:text-emerald-400 transition-colors" />
+            Export Report
+          </button>
         </div>
       </div>
 

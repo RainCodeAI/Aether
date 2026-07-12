@@ -1,5 +1,5 @@
 // lib/enrich.ts
-import { AetherData, OntologyNode } from '@/types';
+import { AetherData } from '@/types';
 
 export interface EnrichSuggestion {
   nodeId: string;
@@ -57,7 +57,7 @@ const ROLE_KEYWORDS: Array<{ pattern: RegExp; role: string }> = [
   { pattern: /research|phd|professor|scientist/i,         role: 'Researcher'        },
 ];
 
-function inferRole(label: string, props: Record<string, any>): string | null {
+function inferRole(label: string, props: Record<string, unknown>): string | null {
   const text = [label, props.title, props.position, props.department].filter(Boolean).join(' ');
   for (const { pattern, role } of ROLE_KEYWORDS) {
     if (pattern.test(text)) return role;
@@ -67,7 +67,7 @@ function inferRole(label: string, props: Record<string, any>): string | null {
 
 // ─── Status suggestion for projects ──────────────────────────────────────────
 
-function inferProjectStatus(props: Record<string, any>): string | null {
+function inferProjectStatus(props: Record<string, unknown>): string | null {
   const progress = Number(props.progress);
   if (!props.status) {
     if (!isNaN(progress)) {

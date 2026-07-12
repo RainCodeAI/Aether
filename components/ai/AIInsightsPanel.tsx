@@ -1,20 +1,21 @@
 // components/ai/AIInsightsPanel.tsx
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   X, Sparkles, BookmarkPlus, BarChart3, Network,
   Trash2, ChevronRight, TrendingUp, TrendingDown, Minus,
   CheckCircle2, AlertCircle, Info, Brain, GitBranch,
   Download, MessageSquarePlus, Plus, Zap, Target, ArrowLeft,
-  Eye, FileText, Share2,
+  Eye, Share2, BookOpen, Shuffle,
 } from 'lucide-react';
 import { useAetherStore } from '@/lib/store';
 import { copyShareUrl } from '@/lib/share';
 import {
-  generateInsight, createInsightNode,
-  AnalysisResult, AnalysisIntent, SavedInsight, AutoInsight,
+  generateInsight, createInsightNode, getRandomInsight,
+  AnalysisResult, AnalysisIntent, SavedInsight,
 } from '@/lib/ai-search';
+import Tooltip from '@/components/ui/Tooltip';
 
 // ─── Intent metadata ──────────────────────────────────────────────────────────
 
@@ -121,14 +122,14 @@ export default function AIInsightsPanel() {
   const {
     isAIAnalystOpen, setAIAnalystOpen,
     searchQuery, setSearchQuery,
-    data, setData,
+    data, addNode,
     setCurrentView,
     savedInsights, addSavedInsight, removeSavedInsight,
     currentWorkspaceId,
+    setReportGeneratorOpen, setReportFocusNodeId,
   } = useAetherStore();
 
   const [activeTab,    setActiveTab]    = useState<'analysis' | 'saved' | 'suggestions'>('analysis');
-  const [result,       setResult]       = useState<AnalysisResult | null>(null);
   const [savedState,   setSavedState]   = useState<'idle' | 'done'>('idle');
   const [graphState,   setGraphState]   = useState<'idle' | 'done'>('idle');
   const [taskState,    setTaskState]    = useState<'idle' | 'done'>('idle');
@@ -138,17 +139,25 @@ export default function AIInsightsPanel() {
   const [showTrace,    setShowTrace]    = useState(false);
   const followUpRef = useRef<HTMLInputElement>(null);
 
-  // Recompute analysis whenever the panel opens or query changes
-  useEffect(() => {
-    if (isAIAnalystOpen && searchQuery.trim()) {
-      setResult(generateInsight(data, searchQuery));
-      setSavedState('idle');
-      setGraphState('idle');
-      setTaskState('idle');
-      setViewingSaved(null);
-      setShowTrace(false);
-    }
-  }, [isAIAnalystOpen, searchQuery, data]);
+  // Analysis is derived from the live graph + query. Computing it here (instead of
+  // in an effect keyed on `data`) means Add-to-Graph / Create-Task — which call
+  // addNode — no longer wipe the action-button confirmation state.
+  const result = useMemo<AnalysisResult | null>(
+    () => (isAIAnalystOpen && searchQuery.trim() ? generateInsight(data, searchQuery) : null),
+    [isAIAnalystOpen, searchQuery, data],
+  );
+
+  // Reset per-analysis action state when the query changes (render-phase pattern,
+  // avoids a cascading setState-in-effect).
+  const [analysisKey, setAnalysisKey] = useState(searchQuery);
+  if (searchQuery !== analysisKey) {
+    setAnalysisKey(searchQuery);
+    setSavedState('idle');
+    setGraphState('idle');
+    setTaskState('idle');
+    setViewingSaved(null);
+    setShowTrace(false);
+  }
 
   const close = useCallback(() => {
     setAIAnalystOpen(false);
@@ -156,6 +165,9 @@ export default function AIInsightsPanel() {
     setViewingSaved(null);
     setFollowUpText('');
     setShowTrace(false);
+    setSavedState('idle');
+    setGraphState('idle');
+    setTaskState('idle');
   }, [setAIAnalystOpen]);
 
   useEffect(() => {
@@ -182,10 +194,7 @@ export default function AIInsightsPanel() {
   const handleAddToGraph = () => {
     if (!result || !searchQuery.trim() || graphState !== 'idle') return;
     const insightNode = createInsightNode(searchQuery, result);
-    setData({
-      nodes: [...data.nodes, insightNode],
-      relationships: data.relationships,
-    });
+    addNode(insightNode);
     setGraphState('done');
   };
 
@@ -193,9 +202,9 @@ export default function AIInsightsPanel() {
     if (!result || taskState !== 'idle') return;
     const rec = result.recommendations[0];
     if (!rec) return;
-    const taskNode = {
+    addNode({
       id: `task-${Date.now()}`,
-      type: 'Event' as const,
+      type: 'Event',
       label: `Task: ${rec.replace(/^[⚠◆→\s]+/, '').slice(0, 60)}`,
       properties: {
         type:        'task',
@@ -205,10 +214,6 @@ export default function AIInsightsPanel() {
         createdFrom: searchQuery,
       },
       createdAt: new Date().toISOString().split('T')[0],
-    };
-    setData({
-      nodes: [...data.nodes, taskNode],
-      relationships: data.relationships,
     });
     setTaskState('done');
   };
@@ -598,71 +603,101 @@ export default function AIInsightsPanel() {
             {/* Primary action row */}
             <div className="flex gap-2 flex-wrap">
               {/* Save to Library */}
-              <button
-                onClick={handleSaveToLibrary}
-                disabled={savedState !== 'idle' || !!viewingSaved}
-                title="Save this analysis to your insight library"
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium transition-all ${
-                  savedState === 'done'
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                    : 'bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 disabled:opacity-40'
-                }`}
-              >
-                {savedState === 'done' ? <><CheckCircle2 size={13} /> Saved!</> : <><BookmarkPlus size={13} /> Save</>}
-              </button>
+              <Tooltip content="Pin this analysis to your insight library" position="top">
+                <button
+                  onClick={handleSaveToLibrary}
+                  disabled={savedState !== 'idle' || !!viewingSaved}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium transition-all ${
+                    savedState === 'done'
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                      : 'bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 disabled:opacity-40'
+                  }`}
+                >
+                  {savedState === 'done' ? <><CheckCircle2 size={13} /> Saved!</> : <><BookmarkPlus size={13} /> Save</>}
+                </button>
+              </Tooltip>
 
               {/* Add to Graph */}
-              <button
-                onClick={handleAddToGraph}
-                disabled={graphState !== 'idle' || !!viewingSaved}
-                title="Add this insight as a node in the ontology graph"
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium transition-all ${
-                  graphState === 'done'
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 disabled:opacity-40'
-                }`}
-              >
-                {graphState === 'done' ? <><CheckCircle2 size={13} /> Added!</> : <><Plus size={13} /> Add to Graph</>}
-              </button>
+              <Tooltip content="Create an Insight node in your ontology graph" position="top">
+                <button
+                  onClick={handleAddToGraph}
+                  disabled={graphState !== 'idle' || !!viewingSaved}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium transition-all ${
+                    graphState === 'done'
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 disabled:opacity-40'
+                  }`}
+                >
+                  {graphState === 'done' ? <><CheckCircle2 size={13} /> Added!</> : <><Plus size={13} /> Add to Graph</>}
+                </button>
+              </Tooltip>
 
               {/* Create Task */}
-              <button
-                onClick={handleCreateTask}
-                disabled={taskState !== 'idle' || !!viewingSaved}
-                title="Create a task entity from the top recommendation"
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium transition-all ${
-                  taskState === 'done'
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 disabled:opacity-40'
-                }`}
-              >
-                {taskState === 'done' ? <><CheckCircle2 size={13} /> Created!</> : <><Target size={13} /> Create Task</>}
-              </button>
+              <Tooltip content="Turn the top recommendation into a trackable task entity" position="top">
+                <button
+                  onClick={handleCreateTask}
+                  disabled={taskState !== 'idle' || !!viewingSaved}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium transition-all ${
+                    taskState === 'done'
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 disabled:opacity-40'
+                  }`}
+                >
+                  {taskState === 'done' ? <><CheckCircle2 size={13} /> Created!</> : <><Target size={13} /> Create Task</>}
+                </button>
+              </Tooltip>
 
-              {/* Export */}
-              <button
-                onClick={handleExport}
-                title="Download analysis as a text report"
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-all"
-              >
-                <Download size={13} /> Export
-              </button>
+              {/* Export txt */}
+              <Tooltip content="Download analysis as a plain-text report" position="top">
+                <button
+                  onClick={handleExport}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-all"
+                >
+                  <Download size={13} /> Export
+                </button>
+              </Tooltip>
+
+              {/* PDF Report */}
+              <Tooltip content="Generate a formatted PDF intelligence brief" position="top">
+                <button
+                  onClick={() => { setReportFocusNodeId(undefined); setReportGeneratorOpen(true); }}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium bg-slate-800 hover:bg-emerald-500/10 hover:border-emerald-500/30 hover:text-emerald-300 text-slate-300 border border-slate-700 transition-all"
+                >
+                  <BookOpen size={13} /> PDF Report
+                </button>
+              </Tooltip>
 
               {/* Share */}
-              <button
-                onClick={handleShare}
-                title="Copy shareable link to this analysis"
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium transition-all ${
-                  shareState === 'done'
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
-                }`}
-              >
-                {shareState === 'done'
-                  ? <><CheckCircle2 size={13} /> Copied!</>
-                  : <><Share2 size={13} /> Share</>
-                }
-              </button>
+              <Tooltip content="Copy a shareable link to this analysis" position="top">
+                <button
+                  onClick={handleShare}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium transition-all ${
+                    shareState === 'done'
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                  }`}
+                >
+                  {shareState === 'done'
+                    ? <><CheckCircle2 size={13} /> Copied!</>
+                    : <><Share2 size={13} /> Share</>
+                  }
+                </button>
+              </Tooltip>
+
+              {/* Roll Again — only visible on live (non-saved) analysis */}
+              {!viewingSaved && (
+                <>
+                  <div className="w-px self-stretch bg-slate-800 mx-0.5" />
+                  <Tooltip content="Pick a different random analysis angle" position="top">
+                    <button
+                      onClick={() => setSearchQuery(getRandomInsight(data))}
+                      className="surprise-btn flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium border border-emerald-500/25 hover:border-emerald-400/50 bg-emerald-500/6 hover:bg-emerald-500/12 text-emerald-400 hover:text-emerald-300 transition-all"
+                    >
+                      <Shuffle size={13} /> Roll again
+                    </button>
+                  </Tooltip>
+                </>
+              )}
             </div>
 
             {/* Secondary navigation row */}

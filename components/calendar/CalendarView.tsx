@@ -331,7 +331,7 @@ export default function CalendarView() {
                         <p className={`text-[11px] mt-0.5 ${TYPE_LABEL[node.type as EntityType] ?? 'text-slate-500'}`}>
                           {node.type}
                         </p>
-                        {node.type === 'Event' && node.properties.status && (
+                        {node.type === 'Event' && !!node.properties.status && (
                           <p className="text-[10px] text-slate-600 mt-0.5">{String(node.properties.status)}</p>
                         )}
                         {node.type === 'Project' && node.properties.progress !== undefined && (

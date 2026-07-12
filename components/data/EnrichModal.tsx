@@ -2,9 +2,9 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { X, Sparkles, Check, ChevronRight, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { X, Sparkles, Check, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { useAetherStore } from '@/lib/store';
-import { analyzeEnrichment, applyEnrichment, EnrichSuggestion } from '@/lib/enrich';
+import { analyzeEnrichment, applyEnrichment } from '@/lib/enrich';
 
 const CONFIDENCE_STYLE = {
   high:   { badge: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30', label: 'High'   },

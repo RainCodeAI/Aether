@@ -4,7 +4,7 @@
 import { useState, useMemo } from 'react';
 import { X, Link2, ArrowRight, ChevronDown } from 'lucide-react';
 import { useAetherStore } from '@/lib/store';
-import { OntologyNode, EntityType } from '@/types';
+import { EntityType } from '@/types';
 
 const RELATIONSHIP_TYPES = [
   { value: 'worksOn',        label: 'Works On' },
@@ -44,7 +44,7 @@ interface Props {
 }
 
 export default function ConnectEntityModal({ isOpen, onClose }: Props) {
-  const { selectedNode, data, setData } = useAetherStore();
+  const { selectedNode, data, addRelationship } = useAetherStore();
 
   const [relType, setRelType]         = useState(RELATIONSHIP_TYPES[0].value);
   const [targetId, setTargetId]       = useState('');
@@ -68,17 +68,11 @@ export default function ConnectEntityModal({ isOpen, onClose }: Props) {
   const handleCreate = () => {
     if (!selectedNode || !targetId) return;
 
-    setData({
-      nodes: data.nodes,
-      relationships: [
-        ...data.relationships,
-        {
-          id: `rel-${Date.now()}`,
-          from: selectedNode.id,
-          to: targetId,
-          type: relType,
-        },
-      ],
+    addRelationship({
+      id: `rel-${Date.now()}`,
+      from: selectedNode.id,
+      to: targetId,
+      type: relType,
     });
 
     setTargetId('');
