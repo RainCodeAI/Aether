@@ -518,3 +518,42 @@ export function buildTemplateData(templateId: string): AetherData {
 export function starterTemplates(): WorkspaceTemplate[] {
   return WORKSPACE_TEMPLATES.filter((t) => t.id !== 'blank');
 }
+
+/** True when applying a template would wipe existing graph data. */
+export function needsTemplateApplyConfirm(
+  nodeCount: number,
+  relCount = 0
+): boolean {
+  return nodeCount > 0 || relCount > 0;
+}
+
+export function templateApplyConfirmMessage(opts: {
+  templateId: string;
+  nodeCount: number;
+  relCount: number;
+}): string {
+  const name = getTemplate(opts.templateId)?.name ?? opts.templateId;
+  const ent =
+    opts.nodeCount === 1 ? '1 entity' : `${opts.nodeCount} entities`;
+  const rels =
+    opts.relCount === 1 ? '1 relationship' : `${opts.relCount} relationships`;
+  return (
+    `Replace this workspace’s graph with “${name}”?\n\n` +
+    `Current data (${ent} · ${rels}) will be replaced.\n\n` +
+    `You can undo with ⌘Z / Ctrl+Z after applying.`
+  );
+}
+
+/**
+ * Confirm (if needed) then apply. Returns false if the user cancelled.
+ * Uses window.confirm so it works after the command palette has closed.
+ */
+export function confirmTemplateApply(opts: {
+  templateId: string;
+  nodeCount: number;
+  relCount: number;
+}): boolean {
+  if (!needsTemplateApplyConfirm(opts.nodeCount, opts.relCount)) return true;
+  if (typeof window === 'undefined') return true;
+  return window.confirm(templateApplyConfirmMessage(opts));
+}

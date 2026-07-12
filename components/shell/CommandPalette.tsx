@@ -18,6 +18,7 @@ import {
   type PaletteHandlers,
   type RankedCommand,
 } from '@/lib/command-palette';
+import { confirmTemplateApply } from '@/lib/workspace-templates';
 import type { EntityType, OntologyNode } from '@/types';
 
 // ── Type badge colors ─────────────────────────────────────────────────────────
@@ -150,6 +151,12 @@ export default function CommandPalette({
         setCurrentView('dashboard');
       },
       applyTemplate: (templateId) => {
+        const ok = confirmTemplateApply({
+          templateId,
+          nodeCount: data.nodes.length,
+          relCount: data.relationships.length,
+        });
+        if (!ok) return;
         applyTemplate(templateId);
         setCurrentView('dashboard');
       },

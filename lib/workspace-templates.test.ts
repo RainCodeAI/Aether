@@ -4,6 +4,8 @@ import {
   buildTemplateData,
   getTemplate,
   starterTemplates,
+  needsTemplateApplyConfirm,
+  templateApplyConfirmMessage,
 } from './workspace-templates';
 import { useAetherStore } from './store';
 import { emptyGraph, resetStore } from './test-utils/reset-store';
@@ -38,6 +40,24 @@ describe('workspace templates', () => {
   it('getTemplate returns undefined for unknown ids', () => {
     expect(getTemplate('nope')).toBeUndefined();
     expect(buildTemplateData('nope')).toEqual({ nodes: [], relationships: [] });
+  });
+
+  it('needsTemplateApplyConfirm only when graph is non-empty', () => {
+    expect(needsTemplateApplyConfirm(0, 0)).toBe(false);
+    expect(needsTemplateApplyConfirm(1, 0)).toBe(true);
+    expect(needsTemplateApplyConfirm(0, 2)).toBe(true);
+  });
+
+  it('templateApplyConfirmMessage names the template and counts', () => {
+    const msg = templateApplyConfirmMessage({
+      templateId: 'startup',
+      nodeCount: 5,
+      relCount: 3,
+    });
+    expect(msg).toMatch(/Startup ops/);
+    expect(msg).toMatch(/5 entities/);
+    expect(msg).toMatch(/3 relationships/);
+    expect(msg).toMatch(/undo/i);
   });
 });
 

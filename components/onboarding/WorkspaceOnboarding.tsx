@@ -8,6 +8,7 @@ import { useAetherStore } from '@/lib/store';
 import {
   WORKSPACE_TEMPLATES,
   starterTemplates,
+  confirmTemplateApply,
   type TemplateAccent,
   type WorkspaceTemplate,
 } from '@/lib/workspace-templates';
@@ -136,6 +137,7 @@ export default function WorkspaceOnboarding({
     setNewEntityModalOpen,
     workspaces,
     currentWorkspaceId,
+    data,
   } = useAetherStore();
 
   const wsName =
@@ -145,6 +147,13 @@ export default function WorkspaceOnboarding({
   const blank = WORKSPACE_TEMPLATES.find((t) => t.id === 'blank')!;
 
   const handleTemplate = (id: string) => {
+    // Onboarding usually only renders when empty; still guard if data exists.
+    const ok = confirmTemplateApply({
+      templateId: id,
+      nodeCount: data.nodes.length,
+      relCount: data.relationships.length,
+    });
+    if (!ok) return;
     applyTemplate(id);
   };
 
