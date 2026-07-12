@@ -8,10 +8,11 @@ import ReactFlow, {
   Handle, Position, NodeProps,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Search, X } from 'lucide-react';
+import { Search, X, Route } from 'lucide-react';
 import { useAetherStore } from '@/lib/store';
 import { OntologyNode } from '@/types';
 import dagre from 'dagre';
+import PathFinderPanel, { GraphFocusBanner } from '@/components/ontology/PathFinderPanel';
 
 // ─── Viewport cache ────────────────────────────────────────────────────────────
 let viewportCache: { x: number; y: number; zoom: number } | null = null;
@@ -166,7 +167,10 @@ function getSmartProps(node: OntologyNode): Array<{ key: string; val: string }> 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function OntologyGraph() {
-  const { data, selectedNode, setSelectedNode } = useAetherStore();
+  const {
+    data, selectedNode, setSelectedNode,
+    graphFocus, setPathFinderOpen, isPathFinderOpen,
+  } = useAetherStore();
 
   const [hoveredId,     setHoveredId]     = useState<string | null>(null);
   const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
@@ -174,6 +178,15 @@ export default function OntologyGraph() {
   const [graphSearch,   setGraphSearch]   = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
   const [rfInstance,    setRfInstance]    = useState<ReactFlowInstance | null>(null);
+
+  const focusNodeSet = useMemo(
+    () => (graphFocus ? new Set(graphFocus.nodeIds) : null),
+    [graphFocus]
+  );
+  const focusEdgeSet = useMemo(
+    () => (graphFocus ? new Set(graphFocus.edgeIds) : null),
+    [graphFocus]
+  );
 
   // Hover tooltip anchor: screen coords captured once on node-enter
   const [tooltipAnchor, setTooltipAnchor] = useState<{ x: number; y: number } | null>(null);
@@ -264,10 +277,17 @@ export default function OntologyGraph() {
       const inSearch       = searchMatches?.has(n.id) ?? false;
       const isEdgeEndpoint = edgeEndpointNodes?.has(n.id) ?? false;
       const isPulsed       = pulsedId === n.id;
+      const inFocus        = focusNodeSet?.has(n.id) ?? false;
+      const isPathEnd =
+        graphFocus?.mode === 'path' &&
+        (n.id === graphFocus.sourceId || n.id === graphFocus.targetId);
 
       let opacity = 1;
+      // Priority: search > path/neighborhood focus > edge hover > node hover
       if (searchMatches !== null) {
         opacity = inSearch ? 1 : 0.12;
+      } else if (focusNodeSet !== null) {
+        opacity = inFocus ? 1 : 0.1;
       } else if (edgeEndpointNodes !== null) {
         opacity = isEdgeEndpoint ? 1 : 0.15;
       } else if (hoveredId !== null) {
@@ -277,6 +297,10 @@ export default function OntologyGraph() {
       const boxShadow =
         isPulsed
           ? `0 0 0 4px ${color}90, 0 0 44px ${glow}, 0 8px 24px rgba(0,0,0,0.4)`
+          : isPathEnd
+            ? `0 0 0 3px #22D3EE90, 0 0 32px rgba(34,211,238,0.55), 0 8px 24px rgba(0,0,0,0.4)`
+          : inFocus && focusNodeSet
+            ? `0 0 0 2px ${color}55, 0 0 20px ${glow}80, 0 4px 14px rgba(0,0,0,0.35)`
           : isSelected
             ? `0 0 0 3px ${color}40, 0 0 28px ${glow}, 0 8px 24px rgba(0,0,0,0.4)`
             : isHovered
@@ -295,12 +319,12 @@ export default function OntologyGraph() {
         data:     { label: n.label, nodeType: n.type, color, isPulsed },
         position: pos,
         style: {
-          background:   isSelected || isPulsed ? 'rgba(15, 23, 42, 1)' : '#1E2937',
-          border:       `2px solid ${color}`,
+          background:   isSelected || isPulsed || isPathEnd ? 'rgba(15, 23, 42, 1)' : '#1E2937',
+          border:       `2px solid ${isPathEnd ? '#22D3EE' : color}`,
           borderRadius: '14px',
           padding:      '10px 14px',
           width:        NODE_W,
-          fontWeight:   isSelected || isPulsed ? 600 : 400,
+          fontWeight:   isSelected || isPulsed || inFocus ? 600 : 400,
           boxShadow,
           opacity,
           // NOTE: No transform/transformOrigin here — React Flow uses `transform`
@@ -314,6 +338,7 @@ export default function OntologyGraph() {
     const rfEdges: Edge[] = data.relationships.map(rel => {
       const isLinkedEdge  = connectedEdgeIds?.has(rel.id) ?? false;
       const isEdgeHovered = hoveredEdgeId === rel.id;
+      const inFocusEdge   = focusEdgeSet?.has(rel.id) ?? false;
       // Edge stays visible if EITHER endpoint matches — shows connections radiating
       // outward from matched nodes even when the far endpoint is faded.
       const inSearch      = searchMatches !== null
@@ -323,6 +348,8 @@ export default function OntologyGraph() {
       let opacity = 1;
       if (searchMatches !== null) {
         opacity = inSearch ? 1 : 0.08;
+      } else if (focusEdgeSet !== null) {
+        opacity = inFocusEdge ? 1 : 0.06;
       } else if (hoveredEdgeId !== null) {
         opacity = isEdgeHovered ? 1 : 0.06;
       } else if (hoveredId !== null) {
@@ -331,11 +358,13 @@ export default function OntologyGraph() {
 
       const stroke =
         isEdgeHovered              ? '#67E8F9' :
+        inFocusEdge                ? '#22D3EE' :
         isLinkedEdge && hoveredId  ? '#22D3EE' :
         '#475569';
 
       const strokeWidth =
         isEdgeHovered              ? 3   :
+        inFocusEdge                ? 2.75 :
         isLinkedEdge && hoveredId  ? 2.5 :
         1.5;
 
@@ -345,9 +374,10 @@ export default function OntologyGraph() {
         target: rel.to,
         label:  rel.type,
         type:   'smoothstep',
+        animated: inFocusEdge && graphFocus?.mode === 'path',
         style:  { stroke, strokeWidth, opacity },
         labelStyle: {
-          fill:       isEdgeHovered ? '#A5F3FC' : isLinkedEdge && hoveredId ? '#67E8F9' : '#64748B',
+          fill:       isEdgeHovered || inFocusEdge ? '#A5F3FC' : isLinkedEdge && hoveredId ? '#67E8F9' : '#64748B',
           fontSize:   '10px',
           fontFamily: 'monospace',
           fontWeight: 500,
@@ -364,7 +394,7 @@ export default function OntologyGraph() {
     });
 
     return { nodes: rfNodes, edges: rfEdges };
-  }, [data, layout, selectedNode, hoveredId, hoveredEdgeId, pulsedId, connectedToHovered, connectedEdgeIds, edgeEndpointNodes, searchMatches]);
+  }, [data, layout, selectedNode, hoveredId, hoveredEdgeId, pulsedId, connectedToHovered, connectedEdgeIds, edgeEndpointNodes, searchMatches, focusNodeSet, focusEdgeSet, graphFocus]);
 
   // ── Zoom persistence ──────────────────────────────────────────────────────
 
@@ -458,6 +488,27 @@ export default function OntologyGraph() {
       onMouseEnter={() => { graphMouseActive.current = true;  }}
       onMouseLeave={() => { graphMouseActive.current = false; }}
     >
+
+      {/* Path / neighborhood focus banner (when panel closed) */}
+      {!isPathFinderOpen && <GraphFocusBanner />}
+
+      {/* Path finder toggle */}
+      <button
+        type="button"
+        onClick={() => setPathFinderOpen(!isPathFinderOpen)}
+        title="Path finder & neighborhood focus"
+        className={`absolute top-3 right-3 z-[22] flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-[11px] font-medium transition-all shadow-lg ${
+          isPathFinderOpen || graphFocus
+            ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300'
+            : 'bg-[rgba(7,11,22,0.88)] border-slate-700/80 text-slate-400 hover:text-slate-200 hover:border-slate-600'
+        }`}
+        style={{ backdropFilter: 'blur(16px)' }}
+      >
+        <Route size={12} />
+        <span className="hidden sm:inline">Path</span>
+      </button>
+
+      <PathFinderPanel />
 
       {/* ── In-graph search overlay ──────────────────────────────────────────── */}
       <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[20] w-[280px] max-w-[calc(100%-2.5rem)]">

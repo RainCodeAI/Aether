@@ -93,10 +93,16 @@ export default function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps)
         <div className="px-6 py-5 space-y-5">
 
           <Section title="General">
-            <Row keys={[mod, 'K']}         label="Focus search / command bar" />
+            <Row keys={[mod, 'K']}         label="Open command palette" />
             <Row keys={[mod, 'N']}         label="New entity" />
             <Row keys={['?']}              label="Show this panel" />
             <Row keys={['Esc']}            label="Close panel or dismiss" />
+          </Section>
+
+          <Section title="Command palette">
+            <Row keys={['↑', '↓']}         label="Move selection" />
+            <Row keys={['⏎']}              label="Run selected / ask AI" />
+            <Row keys={['Esc']}            label="Close palette" />
           </Section>
 
           <Section title="Navigate">

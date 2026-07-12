@@ -42,6 +42,18 @@ type NodePatch =
   | Partial<Omit<OntologyNode, 'id'>>
   | ((node: OntologyNode) => OntologyNode);
 
+/** Highlight mode for the live intelligence graph (not persisted). */
+export interface GraphFocusState {
+  mode: 'path' | 'neighborhood';
+  nodeIds: string[];
+  edgeIds: string[];
+  title: string;
+  detail?: string;
+  hopDepth?: number;
+  sourceId?: string;
+  targetId?: string;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function emptyGraph(): AetherData {
@@ -136,6 +148,16 @@ interface AetherStore {
 
   dashboardCardOrder: string[];
   setDashboardCardOrder: (order: string[]) => void;
+
+  /** Graph path / neighborhood highlight (ephemeral). */
+  graphFocus: GraphFocusState | null;
+  setGraphFocus: (focus: GraphFocusState | null) => void;
+  clearGraphFocus: () => void;
+  isPathFinderOpen: boolean;
+  setPathFinderOpen: (open: boolean) => void;
+  /** Pre-fill path finder "from" when opening from a node. */
+  pathFinderFromId: string | undefined;
+  setPathFinderFromId: (id: string | undefined) => void;
 }
 
 // ─── Persist migration (v0 → v1: workspace-scoped graphs) ─────────────────────
@@ -373,6 +395,9 @@ export const useAetherStore = create<AetherStore>()(
             workspaceData,
             data: nextData,
             selectedNode: null,
+            graphFocus: null,
+            isPathFinderOpen: false,
+            pathFinderFromId: undefined,
           };
         }),
 
@@ -442,6 +467,14 @@ export const useAetherStore = create<AetherStore>()(
 
       dashboardCardOrder: ['intelligence-feed', 'active-projects', 'key-metrics'],
       setDashboardCardOrder: (order) => set({ dashboardCardOrder: order }),
+
+      graphFocus: null,
+      setGraphFocus: (focus) => set({ graphFocus: focus }),
+      clearGraphFocus: () => set({ graphFocus: null }),
+      isPathFinderOpen: false,
+      setPathFinderOpen: (open) => set({ isPathFinderOpen: open }),
+      pathFinderFromId: undefined,
+      setPathFinderFromId: (id) => set({ pathFinderFromId: id }),
     }),
     {
       name: 'aether-storage-v1',

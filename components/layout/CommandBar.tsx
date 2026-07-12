@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Search, Bell, Menu, Keyboard } from 'lucide-react';
+import { Search, Bell, Menu, Keyboard, Command } from 'lucide-react';
 import { useAetherStore } from '@/lib/store';
 import { generateAutoInsights } from '@/lib/ai-search';
 import WorkspaceSwitcher from '@/components/collaboration/WorkspaceSwitcher';
@@ -41,9 +41,12 @@ interface CommandBarProps {
   onOpenSidebar:   () => void;
   onReset:         () => void;
   onOpenShortcuts: () => void;
+  onOpenPalette?:  () => void;
 }
 
-export default function CommandBar({ onOpenSidebar, onReset, onOpenShortcuts }: CommandBarProps) {
+export default function CommandBar({
+  onOpenSidebar, onReset, onOpenShortcuts, onOpenPalette,
+}: CommandBarProps) {
   const { searchQuery, setSearchQuery, setAIAnalystOpen, data } = useAetherStore();
   const { user } = useSafeUser();
 
@@ -170,20 +173,23 @@ export default function CommandBar({ onOpenSidebar, onReset, onOpenShortcuts }: 
           </div>
         )}
 
-        {/* ⏎ when typing · ⌘K when idle (fades on focus) */}
-        <div className="absolute right-3 top-1/2 -translate-y-1/2 hidden sm:flex pointer-events-none">
+        {/* ⏎ when typing · ⌘K opens palette when idle */}
+        <div className="absolute right-2 top-1/2 -translate-y-1/2 hidden sm:flex">
           {searchQuery.trim() ? (
-            <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-xs text-slate-500 font-mono">
+            <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-xs text-slate-500 font-mono pointer-events-none">
               ⏎
             </kbd>
           ) : (
-            <kbd
-              className={`px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-[10px] text-slate-600 font-mono flex items-center gap-0.5 transition-opacity duration-200 ${
-                isFocused ? 'opacity-0' : 'opacity-100'
+            <button
+              type="button"
+              onClick={() => onOpenPalette?.()}
+              title="Open command palette"
+              className={`px-1.5 py-0.5 bg-slate-800 border border-slate-700 hover:border-slate-500 rounded text-[10px] text-slate-500 hover:text-slate-300 font-mono flex items-center gap-0.5 transition-all duration-200 ${
+                isFocused ? 'opacity-0 pointer-events-none' : 'opacity-100'
               }`}
             >
               ⌘K
-            </kbd>
+            </button>
           )}
         </div>
       </div>
@@ -216,6 +222,16 @@ export default function CommandBar({ onOpenSidebar, onReset, onOpenShortcuts }: 
             className="p-2 hover:bg-slate-800 rounded-xl transition-colors touch-target text-slate-400 hover:text-white"
           >
             <Bell size={17} />
+          </button>
+        </Tooltip>
+
+        <Tooltip content={<>Command palette <TipKbd>⌘K</TipKbd></>} position="bottom" className="hidden sm:inline-flex">
+          <button
+            onClick={() => onOpenPalette?.()}
+            aria-label="Open command palette (⌘K)"
+            className="p-2 hover:bg-slate-800 rounded-xl transition-colors text-slate-500 hover:text-cyan-300"
+          >
+            <Command size={15} />
           </button>
         </Tooltip>
 

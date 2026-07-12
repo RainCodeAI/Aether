@@ -202,8 +202,25 @@ Store shape (simplified):
 ## Scripts
 
 ```bash
-npm run dev      # development server
-npm run build    # production build
-npm run start    # serve production build
-npm run lint     # ESLint
+npm run dev          # development server
+npm run build        # production build
+npm run start        # serve production build
+npm run lint         # ESLint
+npm test             # unit tests (vitest)
+npm run test:watch   # vitest in watch mode
+```
+
+### Tests
+
+Unit tests live next to pure libs (`lib/*.test.ts`):
+
+| Suite | Covers |
+|---|---|
+| `ai-search.test.ts` | `detectIntent`, `searchOntology` |
+| `store.test.ts` | mutations, workspace isolation, snapshots |
+| `share.test.ts` | encode/decode share tokens |
+| `import.test.ts` | JSON import validation & warnings |
+
+```bash
+npm test
 ```
