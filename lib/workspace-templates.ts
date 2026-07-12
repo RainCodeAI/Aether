@@ -545,8 +545,8 @@ export function templateApplyConfirmMessage(opts: {
 }
 
 /**
- * Confirm (if needed) then apply. Returns false if the user cancelled.
- * Uses window.confirm so it works after the command palette has closed.
+ * @deprecated Prefer ConfirmTemplateDialog. Kept for tests / non-UI callers.
+ * Confirm (if needed) via window.confirm. Returns false if cancelled.
  */
 export function confirmTemplateApply(opts: {
   templateId: string;

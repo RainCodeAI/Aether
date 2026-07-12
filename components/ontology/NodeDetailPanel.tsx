@@ -772,9 +772,11 @@ export default function NodeDetailPanel() {
     setPDFUploadModalOpen, setPDFLinkedEntityId,
     setReportGeneratorOpen, setReportFocusNodeId,
     setPathFinderOpen, setPathFinderFromId, setGraphFocus, setCurrentView,
+    removeNodes,
   } = useAetherStore();
   const [connectOpen, setConnectOpen] = useState(false);
   const [shareState, setShareState] = useState<'idle' | 'done'>('idle');
+  const [confirmDeleteEntity, setConfirmDeleteEntity] = useState(false);
 
   // Prefer live graph node so edits stay in sync with the store
   const liveNode = selectedNode
@@ -787,6 +789,7 @@ export default function NodeDetailPanel() {
   if (selectedNode?.id !== prevNodeId) {
     setPrevNodeId(selectedNode?.id);
     setShareState('idle');
+    setConfirmDeleteEntity(false);
   }
 
   useEffect(() => {
@@ -852,6 +855,16 @@ export default function NodeDetailPanel() {
       sourceId: liveNode.id,
     });
     setCurrentView('dashboard');
+  };
+
+  const linkedEdgeCount = data.relationships.filter(
+    (r) => r.from === liveNode.id || r.to === liveNode.id
+  ).length;
+
+  const handleDeleteEntity = () => {
+    removeNodes([liveNode.id]);
+    setConfirmDeleteEntity(false);
+    setSelectedNode(null);
   };
 
   return (
@@ -993,6 +1006,43 @@ export default function NodeDetailPanel() {
             <BookOpen size={14} className="group-hover:text-emerald-400 transition-colors" />
             Export Report
           </button>
+
+          {!confirmDeleteEntity ? (
+            <button
+              type="button"
+              onClick={() => setConfirmDeleteEntity(true)}
+              className="w-full py-2 rounded-2xl border border-transparent hover:border-rose-500/30 text-slate-600 hover:text-rose-400 text-xs transition-all flex items-center justify-center gap-1.5"
+            >
+              <Trash2 size={12} />
+              Delete entity
+            </button>
+          ) : (
+            <div className="rounded-2xl border border-rose-500/30 bg-rose-500/8 p-3 space-y-2">
+              <p className="text-[11px] text-rose-300/90 leading-relaxed text-center">
+                Delete “{liveNode.label}”?
+                {linkedEdgeCount > 0
+                  ? ` This also removes ${linkedEdgeCount} connected link${linkedEdgeCount !== 1 ? 's' : ''}.`
+                  : ''}
+                {' '}Undo with ⌘Z.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setConfirmDeleteEntity(false)}
+                  className="flex-1 py-2 rounded-xl border border-slate-700 text-xs text-slate-400 hover:text-slate-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteEntity}
+                  className="flex-1 py-2 rounded-xl bg-rose-500/90 hover:bg-rose-400 text-white text-xs font-semibold"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

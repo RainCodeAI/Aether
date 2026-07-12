@@ -1,6 +1,7 @@
 // components/onboarding/WorkspaceOnboarding.tsx
 'use client';
 
+import { useState } from 'react';
 import {
   Plus, Upload, Sparkles, Layers, ArrowRight,
 } from 'lucide-react';
@@ -8,10 +9,13 @@ import { useAetherStore } from '@/lib/store';
 import {
   WORKSPACE_TEMPLATES,
   starterTemplates,
-  confirmTemplateApply,
+  needsTemplateApplyConfirm,
   type TemplateAccent,
   type WorkspaceTemplate,
 } from '@/lib/workspace-templates';
+import ConfirmTemplateDialog, {
+  type PendingTemplateApply,
+} from '@/components/onboarding/ConfirmTemplateDialog';
 
 const ACCENT: Record<
   TemplateAccent,
@@ -140,6 +144,9 @@ export default function WorkspaceOnboarding({
     data,
   } = useAetherStore();
 
+  const [templatePending, setTemplatePending] =
+    useState<PendingTemplateApply | null>(null);
+
   const wsName =
     workspaces.find((w) => w.id === currentWorkspaceId)?.name ?? 'this workspace';
 
@@ -148,12 +155,14 @@ export default function WorkspaceOnboarding({
 
   const handleTemplate = (id: string) => {
     // Onboarding usually only renders when empty; still guard if data exists.
-    const ok = confirmTemplateApply({
-      templateId: id,
-      nodeCount: data.nodes.length,
-      relCount: data.relationships.length,
-    });
-    if (!ok) return;
+    if (needsTemplateApplyConfirm(data.nodes.length, data.relationships.length)) {
+      setTemplatePending({
+        templateId: id,
+        nodeCount: data.nodes.length,
+        relCount: data.relationships.length,
+      });
+      return;
+    }
     applyTemplate(id);
   };
 
@@ -163,6 +172,15 @@ export default function WorkspaceOnboarding({
         compact ? '' : 'max-w-4xl mx-auto'
       }`}
     >
+      <ConfirmTemplateDialog
+        pending={templatePending}
+        onCancel={() => setTemplatePending(null)}
+        onConfirm={() => {
+          if (!templatePending) return;
+          applyTemplate(templatePending.templateId);
+          setTemplatePending(null);
+        }}
+      />
       <div className={`text-center ${compact ? 'mb-6' : 'mb-8 sm:mb-10'}`}>
         <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-emerald-500/10 border border-cyan-500/25 mb-4">
           <Layers size={26} className="text-cyan-400" />

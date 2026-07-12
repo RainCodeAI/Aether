@@ -1,7 +1,7 @@
 // components/ontology/ConnectionsEditor.tsx
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ArrowRight, ArrowLeftRight, Trash2, ExternalLink, Plus, AlertTriangle,
 } from 'lucide-react';
@@ -12,7 +12,6 @@ import {
   relationshipTypeLabel,
 } from '@/lib/relationship-types';
 
-// Keep in sync with NodeDetailPanel type badges
 const TYPE_BADGE: Record<EntityType, string> = {
   Person:   'bg-cyan-500/10 text-cyan-300 border-cyan-500/30',
   Project:  'bg-purple-500/10 text-purple-300 border-purple-500/30',
@@ -32,7 +31,7 @@ interface ConnectionRow {
 
 function SectionLabel({ children, count }: { children: React.ReactNode; count?: number }) {
   return (
-    <h3 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600 mb-3 flex items-center gap-2">
+    <h3 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600 mb-0 flex items-center gap-2">
       {children}
       {count !== undefined && (
         <span className="font-mono normal-case text-slate-700">{count}</span>
@@ -57,51 +56,125 @@ export default function ConnectionsEditor({ nodeId, onConnect }: ConnectionsEdit
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [editingTypeId, setEditingTypeId] = useState<string | null>(null);
+  const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [confirmClearBroken, setConfirmClearBroken] = useState(false);
 
-  const connections: ConnectionRow[] = data.relationships
-    .filter((r) => r.from === nodeId || r.to === nodeId)
-    .map((r) => {
-      const isOut = r.from === nodeId;
-      const otherId = isOut ? r.to : r.from;
-      const other = data.nodes.find((n) => n.id === otherId);
-      return {
-        rel: r,
-        other,
-        direction: isOut ? ('out' as const) : ('in' as const),
-        dangling: !other,
-      };
-    })
-    // Stable: out first, then by label
-    .sort((a, b) => {
-      if (a.dangling !== b.dangling) return a.dangling ? 1 : -1;
-      const la = a.other?.label ?? a.rel.to;
-      const lb = b.other?.label ?? b.rel.to;
-      return la.localeCompare(lb);
-    });
+  const connections: ConnectionRow[] = useMemo(() => {
+    return data.relationships
+      .filter((r) => r.from === nodeId || r.to === nodeId)
+      .map((r) => {
+        const isOut = r.from === nodeId;
+        const otherId = isOut ? r.to : r.from;
+        const other = data.nodes.find((n) => n.id === otherId);
+        return {
+          rel: r,
+          other,
+          direction: isOut ? ('out' as const) : ('in' as const),
+          dangling: !other,
+        };
+      })
+      .sort((a, b) => {
+        if (a.dangling !== b.dangling) return a.dangling ? 1 : -1;
+        const la = a.other?.label ?? a.rel.to;
+        const lb = b.other?.label ?? b.rel.to;
+        return la.localeCompare(lb);
+      });
+  }, [data.relationships, data.nodes, nodeId]);
+
+  const typeOptions = useMemo(() => {
+    const types = new Set(connections.map((c) => c.rel.type));
+    return [...types].sort();
+  }, [connections]);
+
+  const filtered = useMemo(() => {
+    if (typeFilter === 'all') return connections;
+    if (typeFilter === 'broken') return connections.filter((c) => c.dangling);
+    return connections.filter((c) => c.rel.type === typeFilter);
+  }, [connections, typeFilter]);
 
   const danglingCount = connections.filter((c) => c.dangling).length;
+  const danglingIds = connections.filter((c) => c.dangling).map((c) => c.rel.id);
+
+  const clearBroken = () => {
+    for (const id of danglingIds) removeRelationship(id);
+    setConfirmClearBroken(false);
+    if (typeFilter === 'broken') setTypeFilter('all');
+  };
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-3 gap-2">
         <SectionLabel count={connections.length}>Connections</SectionLabel>
         <button
           type="button"
           onClick={onConnect}
-          className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-cyan-300 transition-colors px-1.5 py-0.5 rounded-lg hover:bg-cyan-500/10"
+          className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-cyan-300 transition-colors px-1.5 py-0.5 rounded-lg hover:bg-cyan-500/10 shrink-0"
         >
           <Plus size={12} />
           Add
         </button>
       </div>
 
+      {connections.length > 0 && (
+        <div className="flex items-center gap-2 mb-2.5 flex-wrap">
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            className="flex-1 min-w-[120px] bg-slate-900/80 border border-slate-800 rounded-lg px-2 py-1.5 text-[11px] text-slate-300 outline-none focus:border-cyan-500/40"
+            aria-label="Filter connections by type"
+          >
+            <option value="all">All types ({connections.length})</option>
+            {danglingCount > 0 && (
+              <option value="broken">Broken only ({danglingCount})</option>
+            )}
+            {typeOptions.map((t) => {
+              const n = connections.filter((c) => c.rel.type === t).length;
+              return (
+                <option key={t} value={t}>
+                  {relationshipTypeLabel(t)} ({n})
+                </option>
+              );
+            })}
+          </select>
+        </div>
+      )}
+
       {danglingCount > 0 && (
         <div className="flex items-start gap-2 mb-2.5 px-2.5 py-2 rounded-xl bg-amber-500/8 border border-amber-500/20 text-[11px] text-amber-300/90">
           <AlertTriangle size={12} className="shrink-0 mt-0.5" />
-          <span>
-            {danglingCount} broken link{danglingCount !== 1 ? 's' : ''} point to
-            missing entities — delete them to clean the graph.
-          </span>
+          <div className="flex-1 min-w-0">
+            <p>
+              {danglingCount} broken link{danglingCount !== 1 ? 's' : ''} point to
+              missing entities.
+            </p>
+            {!confirmClearBroken ? (
+              <button
+                type="button"
+                onClick={() => setConfirmClearBroken(true)}
+                className="mt-1.5 text-[11px] font-medium text-amber-200 hover:text-white underline-offset-2 hover:underline"
+              >
+                Delete all broken links
+              </button>
+            ) : (
+              <div className="mt-1.5 flex items-center gap-2">
+                <span className="text-amber-200/80">Remove {danglingCount}?</span>
+                <button
+                  type="button"
+                  onClick={clearBroken}
+                  className="px-2 py-0.5 rounded-md bg-rose-500/20 border border-rose-500/30 text-rose-300 font-medium"
+                >
+                  Confirm
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmClearBroken(false)}
+                  className="text-slate-500 hover:text-slate-300"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -113,9 +186,13 @@ export default function ConnectionsEditor({ nodeId, onConnect }: ConnectionsEdit
         >
           No connections yet — link this entity to another
         </button>
+      ) : filtered.length === 0 ? (
+        <p className="text-center text-xs text-slate-600 py-6">
+          No connections match this filter
+        </p>
       ) : (
         <div className="space-y-1.5 max-h-72 overflow-y-auto pr-0.5">
-          {connections.map(({ rel, other, direction, dangling }) => {
+          {filtered.map(({ rel, other, direction, dangling }) => {
             const otherMeta = other
               ? TYPE_BADGE[other.type] ?? TYPE_BADGE.Document
               : TYPE_BADGE.Document;
@@ -131,7 +208,6 @@ export default function ConnectionsEditor({ nodeId, onConnect }: ConnectionsEdit
                     : 'border-slate-800/80 bg-slate-900/50 hover:border-slate-700'
                 }`}
               >
-                {/* Main row */}
                 <div className="flex items-center gap-2 px-2.5 py-2">
                   <button
                     type="button"
@@ -174,7 +250,6 @@ export default function ConnectionsEditor({ nodeId, onConnect }: ConnectionsEdit
                     )}
                   </button>
 
-                  {/* Actions */}
                   <div className="flex items-center gap-0.5 shrink-0">
                     <button
                       type="button"
@@ -217,7 +292,6 @@ export default function ConnectionsEditor({ nodeId, onConnect }: ConnectionsEdit
                   </div>
                 </div>
 
-                {/* Type editor */}
                 {isEditingType && (
                   <div className="px-2.5 pb-2.5 flex items-center gap-2 border-t border-slate-800/60 pt-2">
                     <select
@@ -245,7 +319,6 @@ export default function ConnectionsEditor({ nodeId, onConnect }: ConnectionsEdit
                   </div>
                 )}
 
-                {/* Delete confirm */}
                 {isConfirming && (
                   <div className="px-2.5 pb-2.5 flex items-center justify-between gap-2 border-t border-rose-500/20 pt-2">
                     <span className="text-[11px] text-rose-300/90">Remove this link?</span>

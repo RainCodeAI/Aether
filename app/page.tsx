@@ -18,6 +18,9 @@ import ConfirmImportDialog, {
 import CommandPalette from '@/components/shell/CommandPalette';
 import SettingsPanel from '@/components/shell/SettingsPanel';
 import ShortcutsModal from '@/components/ui/ShortcutsModal';
+import ConfirmTemplateDialog, {
+  type PendingTemplateApply,
+} from '@/components/onboarding/ConfirmTemplateDialog';
 import { useAetherStore } from '@/lib/store';
 import { useKeyboardShortcuts } from '@/lib/hooks/useKeyboardShortcuts';
 import { importFromJSON } from '@/lib/import';
@@ -31,16 +34,19 @@ export default function AetherDashboard() {
     importWorkspaces,
     workspaces,
     currentView,
+    setCurrentView,
     isNewEntityModalOpen,
     setNewEntityModalOpen,
     isPDFUploadModalOpen,
     setPDFUploadModalOpen,
     pdfLinkedEntityId,
     setPDFLinkedEntityId,
+    applyTemplate,
   } = useAetherStore();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importPending, setImportPending] = useState<PendingImport | null>(null);
+  const [templatePending, setTemplatePending] = useState<PendingTemplateApply | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [shareToken, setShareToken] = useState<ShareToken | null>(null);
@@ -235,6 +241,23 @@ export default function AetherDashboard() {
         onOpenSettings={() => {
           setPaletteOpen(false);
           setSettingsOpen(true);
+        }}
+        onRequestTemplateApply={(pending) => setTemplatePending(pending)}
+      />
+
+      <ConfirmTemplateDialog
+        pending={templatePending}
+        onCancel={() => setTemplatePending(null)}
+        onConfirm={() => {
+          if (!templatePending) return;
+          applyTemplate(templatePending.templateId);
+          setCurrentView('dashboard');
+          setTemplatePending(null);
+          setToast({
+            type: 'success',
+            title: 'Template applied',
+            message: 'Workspace graph replaced. Undo with ⌘Z if needed.',
+          });
         }}
       />
 

@@ -18,8 +18,11 @@ import {
   type PaletteHandlers,
   type RankedCommand,
 } from '@/lib/command-palette';
-import { confirmTemplateApply } from '@/lib/workspace-templates';
+import {
+  needsTemplateApplyConfirm,
+} from '@/lib/workspace-templates';
 import type { EntityType, OntologyNode } from '@/types';
+import type { PendingTemplateApply } from '@/components/onboarding/ConfirmTemplateDialog';
 
 // ── Type badge colors ─────────────────────────────────────────────────────────
 
@@ -46,6 +49,8 @@ interface CommandPaletteProps {
   onImportClick: () => void;
   onOpenShortcuts: () => void;
   onOpenSettings?: () => void;
+  /** When set, non-empty template applies go through a glass confirm dialog. */
+  onRequestTemplateApply?: (pending: PendingTemplateApply) => void;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -56,6 +61,7 @@ export default function CommandPalette({
   onImportClick,
   onOpenShortcuts,
   onOpenSettings,
+  onRequestTemplateApply,
 }: CommandPaletteProps) {
   const {
     data,
@@ -151,12 +157,16 @@ export default function CommandPalette({
         setCurrentView('dashboard');
       },
       applyTemplate: (templateId) => {
-        const ok = confirmTemplateApply({
-          templateId,
-          nodeCount: data.nodes.length,
-          relCount: data.relationships.length,
-        });
-        if (!ok) return;
+        const nodeCount = data.nodes.length;
+        const relCount = data.relationships.length;
+        if (
+          needsTemplateApplyConfirm(nodeCount, relCount) &&
+          onRequestTemplateApply
+        ) {
+          onRequestTemplateApply({ templateId, nodeCount, relCount });
+          return;
+        }
+        // Empty workspace, or no dialog handler — apply immediately
         applyTemplate(templateId);
         setCurrentView('dashboard');
       },
@@ -172,6 +182,7 @@ export default function CommandPalette({
       onImportClick,
       onOpenShortcuts,
       onOpenSettings,
+      onRequestTemplateApply,
       selectedNode,
       setAIAnalystOpen,
       setCurrentView,
