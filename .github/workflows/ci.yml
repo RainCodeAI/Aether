@@ -1,0 +1,47 @@
+# Continuous integration — no secrets required.
+# Optional OpenAI/Clerk keys stay local (.env* is gitignored).
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Test · Typecheck · Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Production build
+        # Build without API keys — app degrades gracefully (no Clerk/OpenAI required).
+        run: npm run build
+        env:
+          # Explicit empty placeholders so Next never picks up accidental runner secrets
+          OPENAI_API_KEY: ''
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ''
+          CLERK_SECRET_KEY: ''
