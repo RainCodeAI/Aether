@@ -5,7 +5,9 @@ import {
   Home, Search, Users, Table2, FolderOpen, Columns2, Clock, Map as MapIcon,
   BarChart3, Database, CalendarDays, Plus, FileText, Upload,
   Sparkles, BookOpen, Keyboard, Shuffle, Network, Download, Route, Focus,
+  Layers,
 } from 'lucide-react';
+import { starterTemplates } from '@/lib/workspace-templates';
 
 export type CommandSection =
   | 'Navigate'
@@ -43,6 +45,7 @@ export interface PaletteHandlers {
   selectEntity: (node: OntologyNode) => void;
   openPathFinder: () => void;
   focusSelectedNeighborhood: () => void;
+  applyTemplate: (templateId: string) => void;
 }
 
 /** Static navigation + action commands (entities are appended at runtime). */
@@ -237,6 +240,17 @@ export function buildStaticCommands(h: PaletteHandlers): PaletteCommand[] {
       icon: Focus,
       run: () => h.focusSelectedNeighborhood(),
     },
+
+    // Templates (replace active graph — useful for empty workspaces)
+    ...starterTemplates().map((t) => ({
+      id: `tpl-${t.id}`,
+      label: `Apply template: ${t.name}`,
+      hint: t.blurb,
+      section: 'Actions' as const,
+      keywords: ['template', 'onboarding', 'seed', 'starter', ...t.tags],
+      icon: Layers,
+      run: () => h.applyTemplate(t.id),
+    })),
   ];
 }
 

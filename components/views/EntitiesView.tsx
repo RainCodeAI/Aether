@@ -1,9 +1,9 @@
 // components/views/EntitiesView.tsx
 'use client';
 
-import { Plus, Upload, Network } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useAetherStore } from '@/lib/store';
-import EmptyState from '@/components/ui/EmptyState';
+import WorkspaceOnboarding from '@/components/onboarding/WorkspaceOnboarding';
 
 interface EntitiesViewProps {
   onImportClick: () => void;
@@ -11,6 +11,14 @@ interface EntitiesViewProps {
 
 export default function EntitiesView({ onImportClick }: EntitiesViewProps) {
   const { data, setSelectedNode, setNewEntityModalOpen } = useAetherStore();
+
+  if (data.nodes.length === 0) {
+    return (
+      <div className="aether-view-enter py-4">
+        <WorkspaceOnboarding onImportClick={onImportClick} compact />
+      </div>
+    );
+  }
 
   return (
     <div className="aether-view-enter">
@@ -27,71 +35,45 @@ export default function EntitiesView({ onImportClick }: EntitiesViewProps) {
         </button>
       </div>
 
-      {data.nodes.length === 0 ? (
-        <div className="glass rounded-3xl">
-          <EmptyState
-            icon={Network}
-            color="cyan"
-            title="Your intelligence graph is empty"
-            description="Add people, projects, locations, metrics, and more to start building your ontology."
-            actions={[
-              {
-                label: 'New Entity',
-                icon: Plus,
-                onClick: () => setNewEntityModalOpen(true),
-              },
-              {
-                label: 'Import JSON',
-                icon: Upload,
-                onClick: onImportClick,
-                variant: 'secondary',
-              },
-            ]}
-            hint="Tip: drag & drop a JSON backup anywhere on the page to import instantly"
-            size="lg"
-          />
-        </div>
-      ) : (
-        <div className="glass rounded-3xl overflow-hidden">
-          <table className="w-full">
-            <thead className="border-b border-slate-700">
-              <tr>
-                <th className="text-left p-6 font-medium text-slate-400">Type</th>
-                <th className="text-left p-6 font-medium text-slate-400">Name</th>
-                <th className="text-left p-6 font-medium text-slate-400">Key Properties</th>
-                <th className="text-left p-6 font-medium text-slate-400">Created</th>
+      <div className="glass rounded-3xl overflow-hidden">
+        <table className="w-full">
+          <thead className="border-b border-slate-700">
+            <tr>
+              <th className="text-left p-6 font-medium text-slate-400">Type</th>
+              <th className="text-left p-6 font-medium text-slate-400">Name</th>
+              <th className="text-left p-6 font-medium text-slate-400">Key Properties</th>
+              <th className="text-left p-6 font-medium text-slate-400">Created</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-800 table-stagger">
+            {data.nodes.map((node) => (
+              <tr
+                key={node.id}
+                onClick={() => setSelectedNode(node)}
+                className="hover:bg-slate-900/70 cursor-pointer transition-colors group"
+              >
+                <td className="p-6">
+                  <span className="inline-block px-4 py-1.5 text-xs font-mono bg-slate-800 rounded-full">
+                    {node.type}
+                  </span>
+                </td>
+                <td className="p-6 font-medium group-hover:text-cyan-400 transition-colors">
+                  {node.label}
+                </td>
+                <td className="p-6 text-sm text-slate-400">
+                  {Object.entries(node.properties)
+                    .slice(0, 2)
+                    .map(([k, v]) => `${k}: ${typeof v === 'object' ? '...' : v}`)
+                    .join(' • ')}
+                </td>
+                <td className="p-6 text-sm text-slate-400">
+                  {node.createdAt ? new Date(node.createdAt).toLocaleDateString() : '—'}
+                </td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800 table-stagger">
-              {data.nodes.map((node) => (
-                <tr
-                  key={node.id}
-                  onClick={() => setSelectedNode(node)}
-                  className="hover:bg-slate-900/70 cursor-pointer transition-colors group"
-                >
-                  <td className="p-6">
-                    <span className="inline-block px-4 py-1.5 text-xs font-mono bg-slate-800 rounded-full">
-                      {node.type}
-                    </span>
-                  </td>
-                  <td className="p-6 font-medium group-hover:text-cyan-400 transition-colors">
-                    {node.label}
-                  </td>
-                  <td className="p-6 text-sm text-slate-400">
-                    {Object.entries(node.properties)
-                      .slice(0, 2)
-                      .map(([k, v]) => `${k}: ${typeof v === 'object' ? '...' : v}`)
-                      .join(' • ')}
-                  </td>
-                  <td className="p-6 text-sm text-slate-400">
-                    {node.createdAt ? new Date(node.createdAt).toLocaleDateString() : '—'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

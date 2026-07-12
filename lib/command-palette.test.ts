@@ -22,6 +22,7 @@ const handlers: PaletteHandlers = {
   selectEntity: noop,
   openPathFinder: noop,
   focusSelectedNeighborhood: noop,
+  applyTemplate: noop,
 };
 
 describe('command palette ranking', () => {

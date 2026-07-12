@@ -9,6 +9,7 @@ import { getRandomInsight } from '@/lib/ai-search';
 import { exportAsJSON, exportAsCSV, exportGraphAsPNG } from '@/lib/export';
 import OntologyGraph from '@/components/ontology/OntologyGraph';
 import DraggableRightColumn from '@/components/dashboard/DraggableRightColumn';
+import WorkspaceOnboarding from '@/components/onboarding/WorkspaceOnboarding';
 import Tooltip, { TipKbd } from '@/components/ui/Tooltip';
 
 interface DashboardViewProps {
@@ -25,6 +26,14 @@ export default function DashboardView({ onImportClick }: DashboardViewProps) {
     setReportGeneratorOpen,
     setReportFocusNodeId,
   } = useAetherStore();
+
+  if (data.nodes.length === 0) {
+    return (
+      <div className="aether-view-enter py-4 sm:py-8">
+        <WorkspaceOnboarding onImportClick={onImportClick} />
+      </div>
+    );
+  }
 
   return (
     <div className="aether-view-enter">

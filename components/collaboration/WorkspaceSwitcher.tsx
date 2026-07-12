@@ -4,12 +4,12 @@ import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Check, Plus, Users, X } from 'lucide-react';
 import { useAetherStore } from '@/lib/store';
 import { useSafeUser } from '@/lib/hooks/useSafeUser';
+import NewWorkspaceModal from '@/components/onboarding/NewWorkspaceModal';
 
 export default function WorkspaceSwitcher() {
   const {
     workspaces,
     currentWorkspaceId,
-    createWorkspace,
     switchWorkspace,
     deleteWorkspace,
     addMemberToCurrentWorkspace,
@@ -20,9 +20,8 @@ export default function WorkspaceSwitcher() {
   const { user } = useSafeUser();
   const [open, setOpen] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
-  const [showNewWs, setShowNewWs] = useState(false);
+  const [showNewModal, setShowNewModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
-  const [newWsName, setNewWsName] = useState('');
   const [inviteDone, setInviteDone] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -38,20 +37,11 @@ export default function WorkspaceSwitcher() {
       if (ref.current && !ref.current.contains(e.target as Node)) {
         setOpen(false);
         setShowInvite(false);
-        setShowNewWs(false);
       }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
-
-  const handleCreateWorkspace = () => {
-    if (!newWsName.trim()) return;
-    createWorkspace(newWsName.trim());
-    setNewWsName('');
-    setShowNewWs(false);
-    setOpen(false);
-  };
 
   const handleInvite = () => {
     const email = inviteEmail.trim();
@@ -65,7 +55,7 @@ export default function WorkspaceSwitcher() {
   return (
     <div className="relative" ref={ref}>
       <button
-        onClick={() => { setOpen((v) => !v); setShowInvite(false); setShowNewWs(false); }}
+        onClick={() => { setOpen((v) => !v); setShowInvite(false); }}
         aria-label="Switch workspace"
         className="flex items-center gap-2 px-3 py-1.5 bg-slate-900/80 hover:bg-slate-800 border border-slate-700/60 hover:border-slate-600 rounded-xl text-sm transition-all"
       >
@@ -87,7 +77,6 @@ export default function WorkspaceSwitcher() {
         <div className="absolute top-full right-0 mt-2 w-68 bg-[#0B1120] border border-slate-700/60 rounded-2xl shadow-2xl z-50 overflow-hidden"
           style={{ width: '272px' }}
         >
-          {/* Workspace list */}
           <div className="p-2">
             <p className="px-3 pt-2 pb-1.5 text-[10px] font-semibold tracking-[0.12em] text-slate-600 uppercase select-none">
               Workspaces
@@ -142,52 +131,21 @@ export default function WorkspaceSwitcher() {
             ))}
           </div>
 
-          {/* New workspace form or button */}
           <div className="border-t border-slate-800/80 p-2 space-y-0.5">
-            {showNewWs ? (
-              <div className="px-2 pb-1 pt-0.5 space-y-2">
-                <p className="text-[10px] text-slate-500 uppercase tracking-widest">New workspace</p>
-                <div className="flex gap-2">
-                  <input
-                    autoFocus
-                    type="text"
-                    value={newWsName}
-                    onChange={(e) => setNewWsName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleCreateWorkspace();
-                      if (e.key === 'Escape') { setShowNewWs(false); setNewWsName(''); }
-                    }}
-                    placeholder="Workspace name…"
-                    className="flex-1 bg-slate-900 border border-slate-700 focus:border-cyan-500 rounded-xl px-3 py-2 text-xs text-slate-300 placeholder-slate-600 outline-none transition-colors"
-                  />
-                  <button
-                    onClick={handleCreateWorkspace}
-                    disabled={!newWsName.trim()}
-                    className="px-3 py-2 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 rounded-xl text-cyan-300 text-xs font-medium transition-all disabled:opacity-40"
-                  >
-                    Create
-                  </button>
-                  <button
-                    onClick={() => { setShowNewWs(false); setNewWsName(''); }}
-                    className="p-2 text-slate-500 hover:text-slate-300 transition-colors"
-                  >
-                    <X size={13} />
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <button
-                onClick={() => { setShowNewWs(true); setShowInvite(false); }}
-                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-all text-sm"
-              >
-                <Plus size={14} />
-                New workspace
-              </button>
-            )}
-
-            {/* Invite toggle */}
             <button
-              onClick={() => { setShowInvite((v) => !v); setShowNewWs(false); }}
+              onClick={() => {
+                setOpen(false);
+                setShowInvite(false);
+                setShowNewModal(true);
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-all text-sm"
+            >
+              <Plus size={14} />
+              New workspace
+            </button>
+
+            <button
+              onClick={() => setShowInvite((v) => !v)}
               className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-all text-sm"
             >
               <Users size={14} />
@@ -195,7 +153,6 @@ export default function WorkspaceSwitcher() {
             </button>
           </div>
 
-          {/* Signed-in user */}
           {user && (
             <div className="border-t border-slate-800/80 px-4 py-2.5 flex items-center gap-2.5">
               <div className="w-6 h-6 rounded-full bg-gradient-to-br from-cyan-400/80 to-emerald-400/80 flex items-center justify-center text-black font-bold text-[10px] shrink-0 select-none">
@@ -210,7 +167,6 @@ export default function WorkspaceSwitcher() {
             </div>
           )}
 
-          {/* Invite form */}
           {showInvite && (
             <div className="border-t border-slate-800/80 p-3 space-y-2">
               <p className="text-[10px] text-slate-500 uppercase tracking-widest select-none">
@@ -235,7 +191,6 @@ export default function WorkspaceSwitcher() {
                 </button>
               </div>
 
-              {/* Member list */}
               {current && current.members.length > 0 && (
                 <div className="space-y-1.5 pt-1">
                   {current.members.map((email) => (
@@ -252,6 +207,11 @@ export default function WorkspaceSwitcher() {
           )}
         </div>
       )}
+
+      <NewWorkspaceModal
+        isOpen={showNewModal}
+        onClose={() => setShowNewModal(false)}
+      />
     </div>
   );
 }

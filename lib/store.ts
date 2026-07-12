@@ -4,6 +4,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { EMPTY_AETHER_DATA, initialAetherData } from './data';
 import { AetherData, OntologyNode, Relationship, Workspace } from '@/types';
 import { SavedInsight } from './ai-search';
+import { buildTemplateData } from './workspace-templates';
 
 const DEFAULT_WORKSPACE: Workspace = {
   id: 'ws-personal',
@@ -139,7 +140,16 @@ interface AetherStore {
 
   workspaces: Workspace[];
   currentWorkspaceId: string;
-  createWorkspace: (name: string) => void;
+  /**
+   * Create a workspace and switch to it.
+   * Optional `templateId` seeds the new graph (see workspace-templates).
+   */
+  createWorkspace: (name: string, options?: { templateId?: string }) => void;
+  /**
+   * Replace the active workspace graph with a template pack.
+   * Intended for empty workspaces / onboarding; clears selection & graph focus.
+   */
+  applyTemplate: (templateId: string) => void;
   switchWorkspace: (id: string) => void;
   renameWorkspace: (id: string, name: string) => void;
   deleteWorkspace: (id: string) => void;
@@ -353,9 +363,13 @@ export const useAetherStore = create<AetherStore>()(
       workspaces: [DEFAULT_WORKSPACE],
       currentWorkspaceId: DEFAULT_WORKSPACE.id,
 
-      createWorkspace: (name) =>
+      createWorkspace: (name, options) =>
         set((state) => {
           const id = `ws-${Date.now()}`;
+          const seed =
+            options?.templateId && options.templateId !== 'blank'
+              ? buildTemplateData(options.templateId)
+              : emptyGraph();
           const ws: Workspace = {
             id,
             name: name.trim() || 'New Workspace',
@@ -369,14 +383,32 @@ export const useAetherStore = create<AetherStore>()(
           const workspaceData = {
             ...state.workspaceData,
             [state.currentWorkspaceId]: state.data,
-            [id]: emptyGraph(),
+            [id]: seed,
           };
           return {
             workspaces: [...state.workspaces, ws],
             currentWorkspaceId: id,
             workspaceData,
-            data: emptyGraph(),
+            data: seed,
             selectedNode: null,
+            graphFocus: null,
+            isPathFinderOpen: false,
+            pathFinderFromId: undefined,
+          };
+        }),
+
+      applyTemplate: (templateId) =>
+        set((state) => {
+          const seed =
+            templateId === 'blank'
+              ? emptyGraph()
+              : buildTemplateData(templateId);
+          return {
+            ...withWorkspaceData(state, seed),
+            selectedNode: null,
+            graphFocus: null,
+            isPathFinderOpen: false,
+            pathFinderFromId: undefined,
           };
         }),
 
