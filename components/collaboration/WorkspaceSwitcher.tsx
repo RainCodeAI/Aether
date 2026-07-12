@@ -74,7 +74,9 @@ export default function WorkspaceSwitcher() {
       </button>
 
       {open && (
-        <div className="absolute top-full right-0 mt-2 w-68 bg-[#0B1120] border border-slate-700/60 rounded-2xl shadow-2xl z-50 overflow-hidden"
+        // z-[60] sits above the command bar; max-height keeps long lists on-screen
+        <div
+          className="absolute top-full right-0 mt-2 bg-[#0B1120] border border-slate-700/60 rounded-2xl shadow-2xl z-[60] overflow-y-auto max-h-[min(70vh,420px)]"
           style={{ width: '272px' }}
         >
           <div className="p-2">

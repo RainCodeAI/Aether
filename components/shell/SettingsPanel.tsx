@@ -1,7 +1,7 @@
 // components/shell/SettingsPanel.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   X, Settings, Download, Trash2, Focus, Keyboard, Command,
   Database, Layers, Info, User, Check, Upload,
@@ -9,6 +9,7 @@ import {
 import { useAetherStore } from '@/lib/store';
 import { exportAsJSON, exportAllWorkspaces } from '@/lib/export';
 import { useSafeUser } from '@/lib/hooks/useSafeUser';
+import ModalShell from '@/components/ui/ModalShell';
 
 interface SettingsPanelProps {
   isOpen: boolean;
@@ -102,17 +103,6 @@ export default function SettingsPanel({
     }
   }
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const h = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', h);
-    return () => window.removeEventListener('keydown', h);
-  }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
-
   const pastLen = history[currentWorkspaceId]?.past.length ?? 0;
   const futureLen = history[currentWorkspaceId]?.future.length ?? 0;
   const totalEntities = Object.values(workspaceData).reduce(
@@ -154,16 +144,14 @@ export default function SettingsPanel({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-[75] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Settings"
+    <ModalShell
+      isOpen={isOpen}
+      onClose={onClose}
+      label="Settings"
+      maxWidthClass="max-w-md"
+      maxHeightClass="max-h-[min(90dvh,640px)]"
+      zClass="z-[75]"
     >
-      <div className="glass w-full max-w-md rounded-3xl shadow-2xl border border-slate-700/60 overflow-hidden flex flex-col max-h-[min(88vh,640px)]">
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-800 shrink-0">
           <div className="flex items-center gap-2.5">
@@ -185,7 +173,7 @@ export default function SettingsPanel({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5 scroll-touch">
+        <div className="flex-1 overflow-y-auto min-h-0 px-6 py-5 space-y-5 scroll-touch">
           {/* Profile */}
           <Section title="Profile" icon={User}>
             <div className="px-4 py-3 flex items-center gap-3">
@@ -367,7 +355,6 @@ export default function SettingsPanel({
             </div>
           </Section>
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 }

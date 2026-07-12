@@ -3,6 +3,7 @@
 
 import { AlertTriangle, Layers } from 'lucide-react';
 import { getTemplate } from '@/lib/workspace-templates';
+import ModalShell from '@/components/ui/ModalShell';
 
 export interface PendingTemplateApply {
   templateId: string;
@@ -21,29 +22,28 @@ export default function ConfirmTemplateDialog({
   onConfirm,
   onCancel,
 }: Props) {
-  if (!pending) return null;
-
-  const tpl = getTemplate(pending.templateId);
-  const name = tpl?.name ?? pending.templateId;
+  const tpl = pending ? getTemplate(pending.templateId) : undefined;
+  const name = tpl?.name ?? pending?.templateId ?? '';
   const emoji = tpl?.emoji ?? '◇';
   const ent =
-    pending.nodeCount === 1 ? '1 entity' : `${pending.nodeCount} entities`;
+    pending && pending.nodeCount === 1
+      ? '1 entity'
+      : `${pending?.nodeCount ?? 0} entities`;
   const rels =
-    pending.relCount === 1
+    pending && pending.relCount === 1
       ? '1 relationship'
-      : `${pending.relCount} relationships`;
+      : `${pending?.relCount ?? 0} relationships`;
 
   return (
-    <div
-      className="fixed inset-0 z-[95] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onCancel();
-      }}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Confirm template apply"
+    <ModalShell
+      isOpen={pending !== null}
+      onClose={onCancel}
+      label="Confirm template apply"
+      maxWidthClass="max-w-md"
+      maxHeightClass="max-h-[min(90dvh,560px)]"
+      zClass="z-[95]"
     >
-      <div className="glass w-full max-w-md rounded-3xl p-8 shadow-2xl border border-slate-700/60 aether-fade-up">
+      <div className="flex-1 overflow-y-auto min-h-0 p-8">
         <div className="flex items-center gap-3 mb-6">
           <div className="w-11 h-11 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0">
             <AlertTriangle size={20} className="text-amber-400" />
@@ -115,6 +115,6 @@ export default function ConfirmTemplateDialog({
           </button>
         </div>
       </div>
-    </div>
+    </ModalShell>
   );
 }

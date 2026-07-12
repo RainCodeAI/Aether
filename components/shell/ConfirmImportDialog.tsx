@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { AlertTriangle, Layers, GitBranch } from 'lucide-react';
 import type { AnyImportResult } from '@/lib/import';
+import ModalShell from '@/components/ui/ModalShell';
 
 export type PendingImport = AnyImportResult & { filename: string };
 
@@ -27,17 +28,18 @@ export default function ConfirmImportDialog({
   onCancel,
 }: ConfirmDialogProps) {
   const [wsMode, setWsMode] = useState<'replace' | 'merge'>('merge');
-
   const isWs = pending.kind === 'workspaces';
 
   return (
-    <div
-      className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[90] flex items-center justify-center p-4"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onCancel();
-      }}
+    <ModalShell
+      isOpen
+      onClose={onCancel}
+      label={isWs ? 'Import workspaces backup' : 'Replace current graph'}
+      maxWidthClass="max-w-md"
+      maxHeightClass="max-h-[min(90dvh,640px)]"
+      zClass="z-[90]"
     >
-      <div className="glass w-full max-w-md rounded-3xl p-8 max-h-[90vh] overflow-y-auto">
+      <div className="flex-1 overflow-y-auto min-h-0 p-8">
         <div className="flex items-center gap-3 mb-6">
           <div className="w-11 h-11 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0">
             {isWs ? (
@@ -203,6 +205,6 @@ export default function ConfirmImportDialog({
           </button>
         </div>
       </div>
-    </div>
+    </ModalShell>
   );
 }
