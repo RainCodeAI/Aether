@@ -42,10 +42,11 @@ interface CommandBarProps {
   onReset:         () => void;
   onOpenShortcuts: () => void;
   onOpenPalette?:  () => void;
+  onOpenSettings?: () => void;
 }
 
 export default function CommandBar({
-  onOpenSidebar, onReset, onOpenShortcuts, onOpenPalette,
+  onOpenSidebar, onReset, onOpenShortcuts, onOpenPalette, onOpenSettings,
 }: CommandBarProps) {
   const {
     searchQuery, setSearchQuery, setAIAnalystOpen, data,
@@ -122,7 +123,7 @@ export default function CommandBar({
         <div className="hidden md:flex items-baseline gap-1.5 shrink-0">
           <span className="text-sm text-slate-500 leading-none">{greetingPart}</span>
           <button
-            onClick={() => { /* TODO: open profile / settings panel */ }}
+            onClick={() => onOpenSettings?.()}
             title="Profile & settings"
             className="text-sm font-medium text-slate-300 hover:text-cyan-400 transition-colors duration-150 leading-none"
           >
@@ -292,9 +293,14 @@ export default function CommandBar({
         {clerkReady ? (
           <UserButton />
         ) : (
-          <div className="w-8 h-8 bg-gradient-to-br from-cyan-400 to-emerald-400 rounded-full flex items-center justify-center text-black font-semibold cursor-pointer select-none text-xs">
-            ?
-          </div>
+          <button
+            type="button"
+            onClick={() => onOpenSettings?.()}
+            title="Settings"
+            className="w-8 h-8 bg-gradient-to-br from-cyan-400 to-emerald-400 rounded-full flex items-center justify-center text-black font-semibold select-none text-xs hover:brightness-110 transition-all"
+          >
+            {(nameLabel[0] ?? '?').toUpperCase()}
+          </button>
         )}
       </div>
     </div>

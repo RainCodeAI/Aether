@@ -5,7 +5,7 @@ import {
   Home, Search, Users, Table2, FolderOpen, Columns2, Clock, Map as MapIcon,
   BarChart3, Database, CalendarDays, Plus, FileText, Upload,
   Sparkles, BookOpen, Keyboard, Shuffle, Network, Download, Route, Focus,
-  Layers, Undo2, Redo2,
+  Layers, Undo2, Redo2, Settings,
 } from 'lucide-react';
 import { starterTemplates } from '@/lib/workspace-templates';
 
@@ -48,6 +48,7 @@ export interface PaletteHandlers {
   applyTemplate: (templateId: string) => void;
   undo: () => void;
   redo: () => void;
+  openSettings: () => void;
 }
 
 /** Static navigation + action commands (entities are appended at runtime). */
@@ -214,6 +215,15 @@ export function buildStaticCommands(h: PaletteHandlers): PaletteCommand[] {
       icon: Keyboard,
       shortcut: '?',
       run: () => h.openShortcuts(),
+    },
+    {
+      id: 'act-settings',
+      label: 'Open settings',
+      hint: 'Export, reset, workspace name…',
+      section: 'Actions',
+      keywords: ['preferences', 'profile', 'export', 'reset', 'config'],
+      icon: Settings,
+      run: () => h.openSettings(),
     },
 
     // Intelligence

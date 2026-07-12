@@ -44,6 +44,7 @@ interface CommandPaletteProps {
   onClose: () => void;
   onImportClick: () => void;
   onOpenShortcuts: () => void;
+  onOpenSettings?: () => void;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -53,6 +54,7 @@ export default function CommandPalette({
   onClose,
   onImportClick,
   onOpenShortcuts,
+  onOpenSettings,
 }: CommandPaletteProps) {
   const {
     data,
@@ -153,6 +155,7 @@ export default function CommandPalette({
       },
       undo: () => undo(),
       redo: () => redo(),
+      openSettings: () => onOpenSettings?.(),
     }),
     [
       applyTemplate,
@@ -161,6 +164,7 @@ export default function CommandPalette({
       data,
       onImportClick,
       onOpenShortcuts,
+      onOpenSettings,
       selectedNode,
       setAIAnalystOpen,
       setCurrentView,

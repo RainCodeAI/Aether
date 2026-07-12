@@ -25,6 +25,7 @@ const handlers: PaletteHandlers = {
   applyTemplate: noop,
   undo: noop,
   redo: noop,
+  openSettings: noop,
 };
 
 describe('command palette ranking', () => {

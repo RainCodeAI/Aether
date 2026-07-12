@@ -14,6 +14,7 @@ import ViewRouter from '@/components/views/ViewRouter';
 import Toast, { type ToastState } from '@/components/shell/Toast';
 import ConfirmImportDialog from '@/components/shell/ConfirmImportDialog';
 import CommandPalette from '@/components/shell/CommandPalette';
+import SettingsPanel from '@/components/shell/SettingsPanel';
 import ShortcutsModal from '@/components/ui/ShortcutsModal';
 import { useAetherStore } from '@/lib/store';
 import { useKeyboardShortcuts } from '@/lib/hooks/useKeyboardShortcuts';
@@ -44,6 +45,7 @@ export default function AetherDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useKeyboardShortcuts({
     isShortcutsOpen: shortcutsOpen,
@@ -133,6 +135,13 @@ export default function AetherDashboard() {
     fileInputRef.current?.click();
   }, []);
 
+  const handleReset = useCallback(() => {
+    if (confirm('Clear all data and reset to defaults?')) {
+      localStorage.removeItem('aether-storage-v1');
+      window.location.reload();
+    }
+  }, []);
+
   return (
     <div className="flex h-screen overflow-hidden">
       <input
@@ -190,6 +199,24 @@ export default function AetherDashboard() {
           setPaletteOpen(false);
           setShortcutsOpen(true);
         }}
+        onOpenSettings={() => {
+          setPaletteOpen(false);
+          setSettingsOpen(true);
+        }}
+      />
+
+      <SettingsPanel
+        isOpen={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        onOpenShortcuts={() => {
+          setSettingsOpen(false);
+          setShortcutsOpen(true);
+        }}
+        onOpenPalette={() => {
+          setSettingsOpen(false);
+          setPaletteOpen(true);
+        }}
+        onReset={handleReset}
       />
 
       <Sidebar
@@ -203,12 +230,8 @@ export default function AetherDashboard() {
           onOpenSidebar={() => setSidebarOpen(true)}
           onOpenShortcuts={() => setShortcutsOpen(true)}
           onOpenPalette={() => setPaletteOpen(true)}
-          onReset={() => {
-            if (confirm('Clear all data and reset to defaults?')) {
-              localStorage.removeItem('aether-storage-v1');
-              window.location.reload();
-            }
-          }}
+          onOpenSettings={() => setSettingsOpen(true)}
+          onReset={handleReset}
         />
 
         {shareToken && (

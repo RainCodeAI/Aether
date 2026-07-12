@@ -1,18 +1,56 @@
 // lib/export.ts
-import { AetherData } from '@/types';
+import { AetherData, Workspace } from '@/types';
 
-export function exportAsJSON(data: AetherData) {
-  const jsonString = JSON.stringify(data, null, 2);
-  const blob = new Blob([jsonString], { type: 'application/json' });
+function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
-
   const link = document.createElement('a');
   link.href = url;
-  link.download = `aether-backup-${new Date().toISOString().split('T')[0]}.json`;
+  link.download = filename;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+}
+
+const dateStamp = () => new Date().toISOString().split('T')[0];
+
+export function exportAsJSON(data: AetherData) {
+  const jsonString = JSON.stringify(data, null, 2);
+  const blob = new Blob([jsonString], { type: 'application/json' });
+  downloadBlob(blob, `aether-backup-${dateStamp()}.json`);
+}
+
+/** Full multi-workspace backup (workspace metadata + per-ws graphs). */
+export interface WorkspacesBundle {
+  format: 'aether-workspaces-v1';
+  exportedAt: string;
+  currentWorkspaceId: string;
+  workspaces: Workspace[];
+  workspaceData: Record<string, AetherData>;
+}
+
+export function exportAllWorkspaces(bundle: {
+  workspaces: Workspace[];
+  workspaceData: Record<string, AetherData>;
+  currentWorkspaceId: string;
+  data: AetherData;
+}) {
+  // Ensure active graph is included (in case workspaceData is slightly stale)
+  const workspaceData = {
+    ...bundle.workspaceData,
+    [bundle.currentWorkspaceId]: bundle.data,
+  };
+  const payload: WorkspacesBundle = {
+    format: 'aether-workspaces-v1',
+    exportedAt: new Date().toISOString(),
+    currentWorkspaceId: bundle.currentWorkspaceId,
+    workspaces: bundle.workspaces,
+    workspaceData,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {
+    type: 'application/json',
+  });
+  downloadBlob(blob, `aether-workspaces-${dateStamp()}.json`);
 }
 
 export function exportAsCSV(data: AetherData) {
