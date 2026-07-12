@@ -39,6 +39,7 @@ export function resetStore(seed: AetherData = emptyGraph()) {
     graphFocus: null,
     isPathFinderOpen: false,
     pathFinderFromId: undefined,
+    history: {},
   });
 }
 

@@ -5,7 +5,7 @@ import {
   Home, Search, Users, Table2, FolderOpen, Columns2, Clock, Map as MapIcon,
   BarChart3, Database, CalendarDays, Plus, FileText, Upload,
   Sparkles, BookOpen, Keyboard, Shuffle, Network, Download, Route, Focus,
-  Layers,
+  Layers, Undo2, Redo2,
 } from 'lucide-react';
 import { starterTemplates } from '@/lib/workspace-templates';
 
@@ -46,6 +46,8 @@ export interface PaletteHandlers {
   openPathFinder: () => void;
   focusSelectedNeighborhood: () => void;
   applyTemplate: (templateId: string) => void;
+  undo: () => void;
+  redo: () => void;
 }
 
 /** Static navigation + action commands (entities are appended at runtime). */
@@ -149,6 +151,26 @@ export function buildStaticCommands(h: PaletteHandlers): PaletteCommand[] {
     },
 
     // Actions
+    {
+      id: 'act-undo',
+      label: 'Undo',
+      hint: 'Revert last graph change',
+      section: 'Actions',
+      keywords: ['history', 'revert', 'back'],
+      icon: Undo2,
+      shortcut: '⌘Z',
+      run: () => h.undo(),
+    },
+    {
+      id: 'act-redo',
+      label: 'Redo',
+      hint: 'Re-apply undone change',
+      section: 'Actions',
+      keywords: ['history', 'forward'],
+      icon: Redo2,
+      shortcut: '⌘⇧Z',
+      run: () => h.redo(),
+    },
     {
       id: 'act-new-entity',
       label: 'New entity',

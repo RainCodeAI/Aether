@@ -70,6 +70,8 @@ export default function CommandPalette({
     setPathFinderFromId,
     setGraphFocus,
     applyTemplate,
+    undo,
+    redo,
   } = useAetherStore();
 
   const [query, setQuery] = useState('');
@@ -149,9 +151,13 @@ export default function CommandPalette({
         applyTemplate(templateId);
         setCurrentView('dashboard');
       },
+      undo: () => undo(),
+      redo: () => redo(),
     }),
     [
       applyTemplate,
+      undo,
+      redo,
       data,
       onImportClick,
       onOpenShortcuts,

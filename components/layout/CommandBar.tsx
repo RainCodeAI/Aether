@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Search, Bell, Menu, Keyboard, Command } from 'lucide-react';
+import { Search, Bell, Menu, Keyboard, Command, Undo2, Redo2 } from 'lucide-react';
 import { useAetherStore } from '@/lib/store';
 import { generateAutoInsights } from '@/lib/ai-search';
 import WorkspaceSwitcher from '@/components/collaboration/WorkspaceSwitcher';
@@ -47,7 +47,17 @@ interface CommandBarProps {
 export default function CommandBar({
   onOpenSidebar, onReset, onOpenShortcuts, onOpenPalette,
 }: CommandBarProps) {
-  const { searchQuery, setSearchQuery, setAIAnalystOpen, data } = useAetherStore();
+  const {
+    searchQuery, setSearchQuery, setAIAnalystOpen, data,
+    undo, redo, canUndo, canRedo, history, currentWorkspaceId,
+  } = useAetherStore();
+  // Subscribe to history so canUndo/canRedo re-render after mutations
+  const pastLen = history[currentWorkspaceId]?.past.length ?? 0;
+  const futureLen = history[currentWorkspaceId]?.future.length ?? 0;
+  void pastLen;
+  void futureLen;
+  const undoEnabled = canUndo();
+  const redoEnabled = canRedo();
   const { user } = useSafeUser();
 
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -214,6 +224,31 @@ export default function CommandBar({
       <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
         <div className="hidden lg:flex">
           <WorkspaceSwitcher />
+        </div>
+
+        <div className="hidden sm:flex items-center gap-0.5">
+          <Tooltip content={<>Undo <TipKbd>⌘Z</TipKbd></>} position="bottom">
+            <button
+              type="button"
+              onClick={() => undo()}
+              disabled={!undoEnabled}
+              aria-label="Undo"
+              className="p-2 hover:bg-slate-800 rounded-xl transition-colors text-slate-500 hover:text-slate-200 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-500"
+            >
+              <Undo2 size={15} />
+            </button>
+          </Tooltip>
+          <Tooltip content={<>Redo <TipKbd>⌘⇧Z</TipKbd></>} position="bottom">
+            <button
+              type="button"
+              onClick={() => redo()}
+              disabled={!redoEnabled}
+              aria-label="Redo"
+              className="p-2 hover:bg-slate-800 rounded-xl transition-colors text-slate-500 hover:text-slate-200 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-500"
+            >
+              <Redo2 size={15} />
+            </button>
+          </Tooltip>
         </div>
 
         <Tooltip content="Notifications" position="bottom">

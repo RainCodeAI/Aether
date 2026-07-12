@@ -23,6 +23,8 @@ const handlers: PaletteHandlers = {
   openPathFinder: noop,
   focusSelectedNeighborhood: noop,
   applyTemplate: noop,
+  undo: noop,
+  redo: noop,
 };
 
 describe('command palette ranking', () => {

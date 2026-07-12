@@ -55,6 +55,14 @@ export interface GraphFocusState {
   targetId?: string;
 }
 
+/** Per-workspace undo/redo stacks (not persisted). */
+export interface HistoryBucket {
+  past: AetherData[];
+  future: AetherData[];
+}
+
+const MAX_HISTORY = 50;
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function emptyGraph(): AetherData {
@@ -94,6 +102,55 @@ function dropDanglingRels(data: AetherData, removedIds: Set<string>): Relationsh
   );
 }
 
+function emptyHistory(): HistoryBucket {
+  return { past: [], future: [] };
+}
+
+function getBucket(
+  history: Record<string, HistoryBucket>,
+  wsId: string
+): HistoryBucket {
+  return history[wsId] ?? emptyHistory();
+}
+
+/**
+ * Push current graph onto the past stack and clear redo for this workspace.
+ * Call immediately before applying a graph mutation.
+ */
+function pushHistory(
+  state: {
+    history: Record<string, HistoryBucket>;
+    currentWorkspaceId: string;
+    data: AetherData;
+  }
+): Record<string, HistoryBucket> {
+  const wsId = state.currentWorkspaceId;
+  const bucket = getBucket(state.history, wsId);
+  const past = [...bucket.past, cloneGraph(state.data)].slice(-MAX_HISTORY);
+  return {
+    ...state.history,
+    [wsId]: { past, future: [] },
+  };
+}
+
+/** Merge history push with a workspace data write. */
+function withHistoryAndData(
+  state: {
+    history: Record<string, HistoryBucket>;
+    workspaceData: Record<string, AetherData>;
+    currentWorkspaceId: string;
+    data: AetherData;
+  },
+  nextData: AetherData,
+  extra: Record<string, unknown> = {}
+) {
+  return {
+    history: pushHistory(state),
+    ...withWorkspaceData(state, nextData),
+    ...extra,
+  };
+}
+
 // ─── Store shape ──────────────────────────────────────────────────────────────
 
 interface AetherStore {
@@ -110,6 +167,13 @@ interface AetherStore {
   addRelationship: (rel: Relationship) => void;
   addRelationships: (rels: Relationship[]) => void;
   removeRelationship: (id: string) => void;
+
+  /** Per-workspace graph history (ephemeral — not in localStorage). */
+  history: Record<string, HistoryBucket>;
+  undo: () => void;
+  redo: () => void;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
 
   searchQuery: string;
   setSearchQuery: (query: string) => void;
@@ -218,13 +282,14 @@ export const useAetherStore = create<AetherStore>()(
     (set, get) => ({
       data: cloneGraph(initialAetherData),
       workspaceData: { [DEFAULT_WORKSPACE.id]: cloneGraph(initialAetherData) },
+      history: {},
 
       setData: (data) =>
-        set((state) => withWorkspaceData(state, data)),
+        set((state) => withHistoryAndData(state, data)),
 
       addNode: (node) =>
         set((state) =>
-          withWorkspaceData(state, {
+          withHistoryAndData(state, {
             nodes: [...state.data.nodes, node],
             relationships: state.data.relationships,
           })
@@ -233,7 +298,7 @@ export const useAetherStore = create<AetherStore>()(
       addNodes: (nodes) =>
         set((state) => {
           if (nodes.length === 0) return {};
-          return withWorkspaceData(state, {
+          return withHistoryAndData(state, {
             nodes: [...state.data.nodes, ...nodes],
             relationships: state.data.relationships,
           });
@@ -261,7 +326,10 @@ export const useAetherStore = create<AetherStore>()(
             state.selectedNode?.id === id
               ? (nodes.find((n) => n.id === id) ?? null)
               : state.selectedNode;
-          return { ...withWorkspaceData(state, next), selectedNode: selected };
+          return {
+            ...withHistoryAndData(state, next),
+            selectedNode: selected,
+          };
         }),
 
       removeNodes: (ids) =>
@@ -276,12 +344,15 @@ export const useAetherStore = create<AetherStore>()(
             state.selectedNode && removed.has(state.selectedNode.id)
               ? null
               : state.selectedNode;
-          return { ...withWorkspaceData(state, next), selectedNode: selected };
+          return {
+            ...withHistoryAndData(state, next),
+            selectedNode: selected,
+          };
         }),
 
       addRelationship: (rel) =>
         set((state) =>
-          withWorkspaceData(state, {
+          withHistoryAndData(state, {
             nodes: state.data.nodes,
             relationships: [...state.data.relationships, rel],
           })
@@ -290,7 +361,7 @@ export const useAetherStore = create<AetherStore>()(
       addRelationships: (rels) =>
         set((state) => {
           if (rels.length === 0) return {};
-          return withWorkspaceData(state, {
+          return withHistoryAndData(state, {
             nodes: state.data.nodes,
             relationships: [...state.data.relationships, ...rels],
           });
@@ -298,11 +369,64 @@ export const useAetherStore = create<AetherStore>()(
 
       removeRelationship: (id) =>
         set((state) =>
-          withWorkspaceData(state, {
+          withHistoryAndData(state, {
             nodes: state.data.nodes,
             relationships: state.data.relationships.filter((r) => r.id !== id),
           })
         ),
+
+      undo: () =>
+        set((state) => {
+          const wsId = state.currentWorkspaceId;
+          const bucket = getBucket(state.history, wsId);
+          if (bucket.past.length === 0) return {};
+          const previous = bucket.past[bucket.past.length - 1];
+          const past = bucket.past.slice(0, -1);
+          const future = [cloneGraph(state.data), ...bucket.future].slice(
+            0,
+            MAX_HISTORY
+          );
+          return {
+            ...withWorkspaceData(state, cloneGraph(previous)),
+            history: {
+              ...state.history,
+              [wsId]: { past, future },
+            },
+            selectedNode: null,
+            graphFocus: null,
+          };
+        }),
+
+      redo: () =>
+        set((state) => {
+          const wsId = state.currentWorkspaceId;
+          const bucket = getBucket(state.history, wsId);
+          if (bucket.future.length === 0) return {};
+          const next = bucket.future[0];
+          const future = bucket.future.slice(1);
+          const past = [...bucket.past, cloneGraph(state.data)].slice(
+            -MAX_HISTORY
+          );
+          return {
+            ...withWorkspaceData(state, cloneGraph(next)),
+            history: {
+              ...state.history,
+              [wsId]: { past, future },
+            },
+            selectedNode: null,
+            graphFocus: null,
+          };
+        }),
+
+      canUndo: () => {
+        const state = get();
+        return getBucket(state.history, state.currentWorkspaceId).past.length > 0;
+      },
+
+      canRedo: () => {
+        const state = get();
+        return getBucket(state.history, state.currentWorkspaceId).future.length > 0;
+      },
 
       searchQuery: '',
       setSearchQuery: (query) => set({ searchQuery: query }),
@@ -351,8 +475,10 @@ export const useAetherStore = create<AetherStore>()(
           const snap = state.snapshots.find((s) => s.id === id);
           if (!snap) return {};
           return {
-            ...withWorkspaceData(state, cloneGraph(snap.data)),
-            selectedNode: null,
+            ...withHistoryAndData(state, cloneGraph(snap.data), {
+              selectedNode: null,
+              graphFocus: null,
+            }),
           };
         }),
       deleteSnapshot: (id) =>
@@ -390,6 +516,10 @@ export const useAetherStore = create<AetherStore>()(
             currentWorkspaceId: id,
             workspaceData,
             data: seed,
+            history: {
+              ...state.history,
+              [id]: emptyHistory(),
+            },
             selectedNode: null,
             graphFocus: null,
             isPathFinderOpen: false,
@@ -404,11 +534,12 @@ export const useAetherStore = create<AetherStore>()(
               ? emptyGraph()
               : buildTemplateData(templateId);
           return {
-            ...withWorkspaceData(state, seed),
-            selectedNode: null,
-            graphFocus: null,
-            isPathFinderOpen: false,
-            pathFinderFromId: undefined,
+            ...withHistoryAndData(state, seed, {
+              selectedNode: null,
+              graphFocus: null,
+              isPathFinderOpen: false,
+              pathFinderFromId: undefined,
+            }),
           };
         }),
 
@@ -459,13 +590,17 @@ export const useAetherStore = create<AetherStore>()(
           if (!switching) {
             workspaceData[state.currentWorkspaceId] = state.data;
           }
+          const { [id]: _histRemoved, ...historyRest } = state.history;
+          void _histRemoved;
           return {
             workspaces,
             workspaceData,
             currentWorkspaceId: nextId,
             data: workspaceData[nextId] ?? emptyGraph(),
+            history: historyRest,
             selectedNode: switching ? null : state.selectedNode,
             snapshots: state.snapshots.filter((s) => s.workspaceId !== id),
+            graphFocus: switching ? null : state.graphFocus,
           };
         }),
 

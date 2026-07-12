@@ -95,6 +95,8 @@ export default function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps)
           <Section title="General">
             <Row keys={[mod, 'K']}         label="Open command palette" />
             <Row keys={[mod, 'N']}         label="New entity" />
+            <Row keys={[mod, 'Z']}         label="Undo graph edit" />
+            <Row keys={[mod, '⇧', 'Z']}   label="Redo graph edit" />
             <Row keys={['?']}              label="Show this panel" />
             <Row keys={['Esc']}            label="Close panel or dismiss" />
           </Section>

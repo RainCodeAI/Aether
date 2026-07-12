@@ -32,6 +32,8 @@ export function useKeyboardShortcuts({
     isPDFUploadModalOpen,
     isAIAnalystOpen,
     isReportGeneratorOpen,
+    undo,
+    redo,
   } = useAetherStore();
 
   const focusSearch = useCallback(() => {
@@ -69,6 +71,29 @@ export function useKeyboardShortcuts({
         e.preventDefault();
         setNewEntityModalOpen(true);
         return;
+      }
+
+      // ── Undo / redo (skip while typing so inputs keep native text undo) ─────
+      if (meta && !isTyping && !isPaletteOpen) {
+        const key = e.key.toLowerCase();
+        // ⌘Z / Ctrl+Z — undo
+        if (!e.shiftKey && key === 'z') {
+          e.preventDefault();
+          undo();
+          return;
+        }
+        // ⌘⇧Z / Ctrl+⇧Z — redo
+        if (e.shiftKey && key === 'z') {
+          e.preventDefault();
+          redo();
+          return;
+        }
+        // Ctrl+Y — redo (Windows convention)
+        if (!e.shiftKey && key === 'y' && e.ctrlKey && !e.metaKey) {
+          e.preventDefault();
+          redo();
+          return;
+        }
       }
 
       // ── ⌘⇧_ / Ctrl+Shift+_ — view navigation + AI ──────────────────────────
@@ -148,6 +173,8 @@ export function useKeyboardShortcuts({
     setPDFUploadModalOpen,
     setReportGeneratorOpen,
     setSelectedNode,
+    undo,
+    redo,
     isShortcutsOpen,
     isNewEntityModalOpen,
     isPDFUploadModalOpen,
