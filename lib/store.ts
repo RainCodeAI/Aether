@@ -180,6 +180,13 @@ interface AetherStore {
   addRelationship: (rel: Relationship) => void;
   addRelationships: (rels: Relationship[]) => void;
   removeRelationship: (id: string) => void;
+  /** Patch type / endpoints / properties of an existing relationship. */
+  updateRelationship: (
+    id: string,
+    patch: Partial<Pick<Relationship, 'type' | 'from' | 'to' | 'properties'>>
+  ) => void;
+  /** Swap from ↔ to on a relationship. */
+  reverseRelationship: (id: string) => void;
 
   /** Per-workspace graph history (ephemeral — not in localStorage). */
   history: Record<string, HistoryBucket>;
@@ -458,6 +465,43 @@ export const useAetherStore = create<AetherStore>()(
             relationships: state.data.relationships.filter((r) => r.id !== id),
           })
         ),
+
+      updateRelationship: (id, patch) =>
+        set((state) => {
+          let found = false;
+          const relationships = state.data.relationships.map((r) => {
+            if (r.id !== id) return r;
+            found = true;
+            return {
+              ...r,
+              ...patch,
+              properties:
+                patch.properties !== undefined
+                  ? { ...(r.properties ?? {}), ...patch.properties }
+                  : r.properties,
+            };
+          });
+          if (!found) return {};
+          return withHistoryAndData(state, {
+            nodes: state.data.nodes,
+            relationships,
+          });
+        }),
+
+      reverseRelationship: (id) =>
+        set((state) => {
+          let found = false;
+          const relationships = state.data.relationships.map((r) => {
+            if (r.id !== id) return r;
+            found = true;
+            return { ...r, from: r.to, to: r.from };
+          });
+          if (!found) return {};
+          return withHistoryAndData(state, {
+            nodes: state.data.nodes,
+            relationships,
+          });
+        }),
 
       undo: () =>
         set((state) => {

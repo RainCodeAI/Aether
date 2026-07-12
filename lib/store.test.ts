@@ -114,6 +114,33 @@ describe('store mutations', () => {
     expect(useAetherStore.getState().data.relationships).toHaveLength(0);
   });
 
+  it('updateRelationship changes type', () => {
+    useAetherStore.getState().addNodes([
+      node({ id: 'a', label: 'A' }),
+      node({ id: 'b', label: 'B' }),
+    ]);
+    useAetherStore.getState().addRelationship(
+      rel({ id: 'r1', from: 'a', to: 'b', type: 'worksOn' })
+    );
+    useAetherStore.getState().updateRelationship('r1', { type: 'dependsOn' });
+    expect(useAetherStore.getState().data.relationships[0].type).toBe('dependsOn');
+  });
+
+  it('reverseRelationship swaps endpoints', () => {
+    useAetherStore.getState().addNodes([
+      node({ id: 'a', label: 'A' }),
+      node({ id: 'b', label: 'B' }),
+    ]);
+    useAetherStore.getState().addRelationship(
+      rel({ id: 'r1', from: 'a', to: 'b', type: 'reportsTo' })
+    );
+    useAetherStore.getState().reverseRelationship('r1');
+    const r = useAetherStore.getState().data.relationships[0];
+    expect(r.from).toBe('b');
+    expect(r.to).toBe('a');
+    expect(r.type).toBe('reportsTo');
+  });
+
   it('setData replaces the active workspace graph', () => {
     useAetherStore.getState().setData({
       nodes: [node({ id: 'z', label: 'Z' })],

@@ -5,18 +5,7 @@ import { useState, useMemo } from 'react';
 import { X, Link2, ArrowRight, ChevronDown } from 'lucide-react';
 import { useAetherStore } from '@/lib/store';
 import { EntityType } from '@/types';
-
-const RELATIONSHIP_TYPES = [
-  { value: 'worksOn',        label: 'Works On' },
-  { value: 'locatedAt',      label: 'Located At' },
-  { value: 'hasMetric',      label: 'Has Metric' },
-  { value: 'owns',           label: 'Owns' },
-  { value: 'impacts',        label: 'Impacts' },
-  { value: 'participatedIn', label: 'Participated In' },
-  { value: 'reportsTo',      label: 'Reports To' },
-  { value: 'dependsOn',      label: 'Depends On' },
-  { value: 'relatedTo',      label: 'Related To' },
-];
+import { RELATIONSHIP_TYPES } from '@/lib/relationship-types';
 
 const TYPE_COLORS: Record<EntityType, string> = {
   Person:   'text-cyan-400',

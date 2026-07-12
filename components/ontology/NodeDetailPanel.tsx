@@ -3,13 +3,14 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  X, Calendar, Lightbulb, GitBranch, ArrowRight, ExternalLink,
+  X, Calendar, Lightbulb, GitBranch,
   Tag, Plus, Hash, Share2, CheckCircle2, FileText, BookOpen,
   Pencil, Trash2, Check, Route, Focus,
 } from 'lucide-react';
 import { useAetherStore } from '@/lib/store';
 import { EntityType, OntologyNode } from '@/types';
 import ConnectEntityModal from './ConnectEntityModal';
+import ConnectionsEditor from './ConnectionsEditor';
 import { copyShareUrl } from '@/lib/share';
 import { findNeighborhood } from '@/lib/graph-path';
 
@@ -815,16 +816,6 @@ export default function NodeDetailPanel() {
   const { label, type, createdAt } = liveNode;
   const meta = TYPE_META[type] ?? TYPE_META.Document;
 
-  const connections = data.relationships
-    .filter((r) => r.from === liveNode.id || r.to === liveNode.id)
-    .map((r) => {
-      const isOut   = r.from === liveNode.id;
-      const otherId = isOut ? r.to : r.from;
-      const other   = data.nodes.find((n) => n.id === otherId);
-      return { rel: r, other, direction: isOut ? 'out' as const : 'in' as const };
-    })
-    .filter((c) => c.other !== undefined);
-
   const handleRunAnalysis = () => {
     setSearchQuery(liveNode.label);
     setAIAnalystOpen(true);
@@ -902,45 +893,11 @@ export default function NodeDetailPanel() {
           {/* Tags */}
           <TagEditor nodeId={liveNode.id} />
 
-          {/* Connections */}
-          {connections.length > 0 && (
-            <div>
-              <SectionLabel count={connections.length}>Connections</SectionLabel>
-              <div className="space-y-1.5 aether-stagger">
-                {connections.slice(0, 7).map(({ rel, other, direction }) => {
-                  if (!other) return null;
-                  const otherMeta = TYPE_META[other.type as EntityType] ?? TYPE_META.Document;
-                  return (
-                    <button
-                      key={rel.id}
-                      onClick={() => setSelectedNode(other)}
-                      className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-slate-900/50 hover:bg-slate-800/70 border border-slate-800/80 hover:border-slate-700 transition-all text-left group press-scale"
-                    >
-                      {direction === 'in' && (
-                        <ArrowRight size={10} className="text-slate-700 shrink-0 rotate-180" />
-                      )}
-                      <span className="text-[10px] font-mono text-slate-600 shrink-0 max-w-[60px] truncate">{rel.type}</span>
-                      {direction === 'out' && (
-                        <ArrowRight size={10} className="text-slate-700 shrink-0" />
-                      )}
-                      <span className="text-xs text-slate-300 group-hover:text-white truncate flex-1 transition-colors">
-                        {other.label}
-                      </span>
-                      <span className={`text-[10px] shrink-0 px-1.5 py-0.5 rounded-full border opacity-50 group-hover:opacity-80 transition-opacity ${otherMeta.badge}`}>
-                        {other.type}
-                      </span>
-                      <ExternalLink size={10} className="text-slate-700 group-hover:text-cyan-400 shrink-0 transition-colors" />
-                    </button>
-                  );
-                })}
-                {connections.length > 7 && (
-                  <p className="text-[11px] text-slate-600 text-center pt-1">
-                    +{connections.length - 7} more connections
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
+          {/* Connections — edit type, reverse, delete */}
+          <ConnectionsEditor
+            nodeId={liveNode.id}
+            onConnect={() => setConnectOpen(true)}
+          />
 
           {/* Metadata */}
           {createdAt && (

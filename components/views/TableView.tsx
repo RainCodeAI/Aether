@@ -223,6 +223,10 @@ export default function TableView({ typeFilter, compact = false }: TableViewProp
 
   // ── Bulk actions ───────────────────────────────────────────────────────────
 
+  const selectedRelImpact = data.relationships.filter(
+    (r) => selectedIds.has(r.from) || selectedIds.has(r.to)
+  ).length;
+
   const handleBulkDelete = () => {
     removeNodes([...selectedIds]);
     setSelectedIds(new Set());
@@ -407,7 +411,13 @@ export default function TableView({ typeFilter, compact = false }: TableViewProp
             </button>
           ) : (
             <div className="flex items-center gap-2">
-              <span className="text-xs text-rose-300">Delete {selectedIds.size}?</span>
+              <span className="text-xs text-rose-300">
+                Delete {selectedIds.size} entit{selectedIds.size !== 1 ? 'ies' : 'y'}
+                {selectedRelImpact > 0
+                  ? ` + ${selectedRelImpact} link${selectedRelImpact !== 1 ? 's' : ''}`
+                  : ''}
+                ?
+              </span>
               <button
                 onClick={handleBulkDelete}
                 className="px-3 py-1.5 rounded-xl text-xs bg-rose-500 hover:bg-rose-400 text-white transition-all font-medium"
